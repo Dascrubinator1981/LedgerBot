@@ -1,31 +1,33 @@
 # Initial manual foundation · readiness report
 
+**Follow-up re-audit:** see [PRELAUNCH_AUDIT.md](PRELAUNCH_AUDIT.md) for current results (57 unit/integration tests and 5 browser flows), fixes and launch blockers. The original milestone results below are historical baseline evidence. [CODEX_PRIVATE_BETA_PROMPT.md](CODEX_PRIVATE_BETA_PROMPT.md) specifies the next staged task; it has not been executed in full.
+
 **Local development milestone; fabricated values only. Not production-ready. Phase 1 is not complete.** No application deployment, payment collection, real bank connection or customer-data import was performed.
 
 ## Feature matrix
 
-| Feature | Status | Evidence / limitation |
-| --- | --- | --- |
-| Next/React/strict TypeScript and responsive forms | Implemented locally | Build, typecheck and lint; sections in one workspace rather than full route/navigation specification |
-| Signup/login/session/logout | Working locally; production partial | Scrypt, opaque hashed sessions, CSRF/origin checks; email verification/reset, MFA and full abuse protection absent |
-| Empty new users, unknown vs known zero | Working | Integration and browser tests; no seed or automatic demo |
-| Tenant authorization | Working within local app boundary | Owner-scoped queries, composite FKs, forged-ID tests; SQLite has no RLS and cannot defend against a compromised app process |
-| Manual accounts/opening snapshot/custom types | Working creation | Custom name, nullable opening value, end-of-day date and USD; rename/correction workflows deferred |
-| Manual transactions/edit/delete/pending/cleared | Working within documented limits | Persistent SQLite, reviewed mutations; reconciled entries immutable; no soft undo and no full intraday running balance |
-| Card purchases/payments/paired transfers | Working | Exact cents, payment excluded from spending, atomic pair operations and rollback tests |
-| Categories and exact splits | Working creation/classification | Signed cent sums required; categorization cannot double-debit; category rename deferred |
-| Reconciliation | Working basic workflow | Statement mismatch blocked, date-bound locks; full discrepancy investigation UI and correction history deferred |
-| Review gateway | Working local ceremony; release assurance partial | Immutable proposal/digest/version, current owner revision, human principal, session challenge, CSRF, expiry, idempotency, receipt and minimal audit |
-| Slide and accessible confirmation | Working in Chromium | Deliberate release, aborted drag and keyboard/tap path tested; independent WCAG/device audit and staging gate remain open |
-| Encrypted drafts, passkey step-up | Not implemented | Local filesystem is not encryption; no biometric claim |
-| Budget PLAN vs actuals | Working minimal | Owner/category/month targets; cleared category allocations, no balance mutation |
-| 7/30/60/90-day Forecaster | Partial | Dated cash actuals, pending and approved recurring estimates, coverage warnings; no schedule/actual occurrence matching or schedule CRUD; estimates may overlap and must not be relied on for real decisions |
-| Setup/Inbox/preferences | Working minimal | Skip/resume status, persistent pending reviews, discard/resume, separate promotion flag; per-item snooze and reminder engine not implemented |
-| Isolated opt-in demo | Not implemented | No demo data is seeded; only isolated fabricated test databases |
-| Export/privacy deletion/restore | Not implemented | No customer-data lifecycle completeness claim |
-| Calendar/debt/savings/sandbox | Not started | No fake controls or computed claims |
-| AI/voice/OCR/banks/billing/MCP | Disabled; not started | Truthful Settings status; no keys or vendor calls needed |
-| CI workflow | Implemented, remote outcome unverified | Installs, migrations, lint/typecheck/unit/build/browser/audit; local success does not establish GitHub Actions success |
+| Feature                                           | Status                                            | Evidence / limitation                                                                                                                                                                                        |
+| ------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Next/React/strict TypeScript and responsive forms | Implemented locally                               | Build, typecheck and lint; sections in one workspace rather than full route/navigation specification                                                                                                         |
+| Signup/login/session/logout                       | Working locally; production partial               | Scrypt, opaque hashed sessions, CSRF/origin checks; email verification/reset, MFA and full abuse protection absent                                                                                           |
+| Empty new users, unknown vs known zero            | Working                                           | Integration and browser tests; no seed or automatic demo                                                                                                                                                     |
+| Tenant authorization                              | Working within local app boundary                 | Owner-scoped queries, composite FKs, forged-ID tests; SQLite has no RLS and cannot defend against a compromised app process                                                                                  |
+| Manual accounts/opening snapshot/custom types     | Working creation                                  | Custom name, nullable opening value, end-of-day date and USD; rename/correction workflows deferred                                                                                                           |
+| Manual transactions/edit/delete/pending/cleared   | Working within documented limits                  | Persistent SQLite, reviewed mutations; reconciled entries immutable; no soft undo and no full intraday running balance                                                                                       |
+| Card purchases/payments/paired transfers          | Working                                           | Exact cents, payment excluded from spending, atomic pair operations and rollback tests                                                                                                                       |
+| Categories and exact splits                       | Working creation/classification                   | Signed cent sums required; categorization cannot double-debit; category rename deferred                                                                                                                      |
+| Reconciliation                                    | Working basic workflow                            | Statement mismatch blocked, date-bound locks; full discrepancy investigation UI and correction history deferred                                                                                              |
+| Review gateway                                    | Working local ceremony; release assurance partial | Immutable proposal/digest/version, current owner revision, human principal, session challenge, CSRF, expiry, idempotency, receipt and minimal audit                                                          |
+| Slide and accessible confirmation                 | Working in Chromium                               | Deliberate release, aborted drag and keyboard/tap path tested; independent WCAG/device audit and staging gate remain open                                                                                    |
+| Encrypted drafts, passkey step-up                 | Not implemented                                   | Local filesystem is not encryption; no biometric claim                                                                                                                                                       |
+| Budget PLAN vs actuals                            | Working minimal                                   | Owner/category/month targets; cleared category allocations, no balance mutation                                                                                                                              |
+| 7/30/60/90-day Forecaster                         | Partial                                           | Dated cash actuals, pending and approved recurring estimates, coverage warnings; no schedule/actual occurrence matching or schedule CRUD; estimates may overlap and must not be relied on for real decisions |
+| Setup/Inbox/preferences                           | Working minimal                                   | Skip/resume status, persistent pending reviews, discard/resume, separate promotion flag; per-item snooze and reminder engine not implemented                                                                 |
+| Isolated opt-in demo                              | Not implemented                                   | No demo data is seeded; only isolated fabricated test databases                                                                                                                                              |
+| Export/privacy deletion/restore                   | Not implemented                                   | No customer-data lifecycle completeness claim                                                                                                                                                                |
+| Calendar/debt/savings/sandbox                     | Not started                                       | No fake controls or computed claims                                                                                                                                                                          |
+| AI/voice/OCR/banks/billing/MCP                    | Disabled; not started                             | Truthful Settings status; no keys or vendor calls needed                                                                                                                                                     |
+| CI workflow                                       | Implemented, remote outcome unverified            | Installs, migrations, lint/typecheck/unit/build/browser/audit; local success does not establish GitHub Actions success                                                                                       |
 
 ## Commands and observed results
 

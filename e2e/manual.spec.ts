@@ -189,3 +189,185 @@ test("slide requires release and aborted slide cannot commit", async ({
     (await (await page.request.get("/api/state")).json()).accounts,
   ).toHaveLength(1);
 });
+
+test("successful commit receipt survives a failed balance refresh", async ({
+  page,
+}) => {
+  await signup(page);
+  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page
+    .getByLabel("Account name", { exact: true })
+    .fill("Refresh test pocket");
+  await page
+    .getByLabel("Opening balance ($, positive owed for liabilities)")
+    .fill("10");
+  await page.getByLabel("Opening as-of date").fill("2026-01-01");
+  await page
+    .getByRole("button", { name: "Prepare account for review" })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await page.route("**/api/state", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Synthetic balance refresh failure" }),
+    }),
+  );
+  await approve(page);
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Synthetic balance refresh failure" }),
+  ).toBeVisible();
+  expect(
+    (await (await page.request.get("/api/state")).json()).accounts,
+  ).toHaveLength(1);
+  await page.unroute("**/api/state");
+  await page.reload();
+  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Refresh test pocket", exact: true }),
+  ).toBeVisible();
+});
+
+test("reviewed card payment, splits, budget, forecast assumptions and reconciliation agree", async ({
+  page,
+}) => {
+  await signup(page);
+  async function addAccount(name: string, type: string, opening: string) {
+    await page.getByRole("button", { name: "Accounts", exact: true }).click();
+    await page.getByLabel("Account name", { exact: true }).fill(name);
+    await page.getByLabel("Account type", { exact: true }).selectOption(type);
+    await page
+      .getByLabel("Opening balance ($, positive owed for liabilities)")
+      .fill(opening);
+    await page.getByLabel("Opening as-of date").fill("2026-01-01");
+    await page
+      .getByRole("button", { name: "Prepare account for review" })
+      .click();
+    await approve(page);
+  }
+  await addAccount("Synthetic checking", "checking", "1000");
+  await addAccount("Synthetic card", "credit", "50");
+  await addAccount("Synthetic savings", "savings", "0");
+  for (const name of ["Synthetic food", "Synthetic home"]) {
+    await page.getByRole("button", { name: "Budget", exact: true }).click();
+    await page.getByLabel("New category name").fill(name);
+    await page
+      .getByRole("button", { name: "Prepare category", exact: true })
+      .click();
+    await approve(page);
+  }
+  await page.getByRole("button", { name: "Ledger", exact: true }).click();
+  await page
+    .getByLabel("Account", { exact: true })
+    .selectOption({ label: "Synthetic card · credit" });
+  await page.getByLabel("Date", { exact: true }).fill("2026-01-02");
+  await page
+    .getByLabel("Description", { exact: true })
+    .fill("Synthetic mixed purchase");
+  await page.getByLabel("Signed amount ($)", { exact: true }).fill("-20");
+  await page
+    .getByLabel("Split 1 category", { exact: true })
+    .selectOption({ label: "Synthetic food" });
+  await page
+    .getByLabel("Split 1 signed amount ($)", { exact: true })
+    .fill("-12");
+  await page.getByRole("button", { name: "Add another split" }).click();
+  await page
+    .getByLabel("Split 2 category", { exact: true })
+    .selectOption({ label: "Synthetic home" });
+  await page
+    .getByLabel("Split 2 signed amount ($)", { exact: true })
+    .fill("-8");
+  await page
+    .getByRole("button", { name: "Prepare transaction for review" })
+    .click();
+  await approve(page);
+  for (const [destination, amount] of [
+    ["Synthetic card · credit", "30"],
+    ["Synthetic savings · savings", "25"],
+  ]) {
+    await page
+      .getByLabel("From account", { exact: true })
+      .selectOption({ label: "Synthetic checking · checking" });
+    await page
+      .getByLabel("To account (card for payment)", { exact: true })
+      .selectOption({ label: destination });
+    await page.getByLabel("Transfer amount ($, positive)").fill(amount);
+    await page
+      .getByLabel("Transfer description", { exact: true })
+      .fill("Synthetic internal transfer");
+    await page.getByLabel("Transfer date", { exact: true }).fill("2026-01-03");
+    await page.getByRole("button", { name: "Prepare paired transfer" }).click();
+    await approve(page);
+  }
+  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  for (const [name, amount] of [
+    ["Synthetic checking", "$945.00"],
+    ["Synthetic card", "$40.00"],
+    ["Synthetic savings", "$25.00"],
+  ]) {
+    await expect(
+      page
+        .locator(".card")
+        .filter({ has: page.getByRole("heading", { name, exact: true }) })
+        .locator(".amount"),
+    ).toHaveText(amount);
+  }
+  await page.getByRole("button", { name: "Budget", exact: true }).click();
+  await page
+    .getByLabel("Budget category", { exact: true })
+    .selectOption({ label: "Synthetic food" });
+  await page.getByLabel("Budget month", { exact: true }).fill("2026-01");
+  await page.getByLabel("Planned target ($)", { exact: true }).fill("100");
+  await page.getByRole("button", { name: "Prepare budget target" }).click();
+  await approve(page);
+  await expect(
+    page.getByText("Cleared actuals: $12.00", { exact: true }),
+  ).toBeVisible();
+  const before = await (await page.request.get("/api/state")).json();
+  await page.getByRole("button", { name: "Forecaster", exact: true }).click();
+  await page
+    .getByLabel("Account", { exact: true })
+    .selectOption({ label: "Synthetic checking · checking" });
+  await page
+    .getByLabel("Schedule name", { exact: true })
+    .fill("Synthetic weekly bill");
+  await page.getByLabel("Signed recurring amount ($)").fill("-10");
+  await page
+    .getByLabel("First due / expected date")
+    .fill(new Date().toISOString().slice(0, 10));
+  await page
+    .getByRole("button", { name: "Prepare recurring assumption" })
+    .click();
+  await approve(page);
+  const after = await (await page.request.get("/api/state")).json();
+  expect(after.transactions).toEqual(before.transactions);
+  expect(after.recurrences).toHaveLength(1);
+  await expect(
+    page.getByText("Preliminary / incomplete coverage", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page
+    .getByLabel("Account", { exact: true })
+    .selectOption({ label: "Synthetic checking · checking" });
+  await page
+    .getByLabel("Statement ending date", { exact: true })
+    .fill("2026-01-31");
+  await page.getByLabel("Statement ending balance ($)").fill("945");
+  await page
+    .getByRole("button", { name: "Compare and prepare reconciliation" })
+    .click();
+  await approve(page);
+  const final = await (await page.request.get("/api/state")).json();
+  const checkingId = final.accounts.find(
+    (a: { name: string }) => a.name === "Synthetic checking",
+  ).id;
+  expect(
+    final.transactions
+      .filter((t: { accountId: string }) => t.accountId === checkingId)
+      .every((t: { reconciledAt: string }) => t.reconciledAt === "2026-01-31"),
+  ).toBe(true);
+});

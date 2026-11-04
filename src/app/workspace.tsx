@@ -1247,8 +1247,8 @@ export default function Workspace() {
                   idempotencyKey: review.key,
                 });
                 setReview(null);
-                await refresh();
                 setNotice(`Change saved. Receipt ${receipt.id}.`);
+                await refresh();
               })
             }
           />

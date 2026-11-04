@@ -1,3 +1,4 @@
+import { PublicError } from "./errors";
 import {
   randomBytes,
   randomUUID,
@@ -29,7 +30,7 @@ export function throttle(db: DatabaseSync, key: string, now = Date.now()) {
     .prepare("SELECT count,reset_at FROM auth_attempts WHERE key=?")
     .get(hash(key)) as { count: number; reset_at: number } | undefined;
   if (old && old.reset_at > now && old.count >= 15)
-    throw new Error("Too many attempts. Try again in 15 minutes.");
+    throw new PublicError("Too many attempts. Try again in 15 minutes.");
   db.prepare(
     "INSERT INTO auth_attempts VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET count=excluded.count,reset_at=excluded.reset_at",
   ).run(
@@ -54,7 +55,7 @@ export function authenticate(
   const derived = scryptSync(password, salt, 64);
   if (signup) {
     if (existing)
-      throw new Error("Unable to create account with these credentials");
+      throw new PublicError("Unable to create account with these credentials");
     const id = randomUUID();
     db.prepare("INSERT INTO users(id,email,password) VALUES(?,?,?)").run(
       id,
@@ -70,7 +71,7 @@ export function authenticate(
       Buffer.from(existing.password.split(":")[1], "hex"),
     )
   )
-    throw new Error("Invalid email or password");
+    throw new PublicError("Invalid email or password");
   return createSession(db, existing.id);
 }
 export function createSession(db: DatabaseSync, userId: string) {
@@ -86,14 +87,14 @@ export function createSession(db: DatabaseSync, userId: string) {
   return { token, csrf };
 }
 export function getSession(db: DatabaseSync, token?: string): Session {
-  if (!token) throw new Error("Sign in required");
+  if (!token) throw new PublicError("Sign in required", 401);
   const row = db
     .prepare(
       "SELECT user_id,csrf,principal FROM sessions WHERE hash=? AND expires>?",
     )
     .get(hash(token), Date.now()) as
     { user_id: string; csrf: string; principal: "human" | "ai" } | undefined;
-  if (!row) throw new Error("Sign in required");
+  if (!row) throw new PublicError("Sign in required", 401);
   return {
     userId: row.user_id,
     csrf: row.csrf,

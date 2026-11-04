@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { database } from "./db";
 import { getSession, type Session } from "./auth";
+import { PublicError, publicFailure } from "./errors";
 export const COOKIE = "ledgerbot_session";
 export function session(request: NextRequest) {
   return getSession(database(), request.cookies.get(COOKIE)?.value);
@@ -15,21 +16,21 @@ export function sameOrigin(request: NextRequest) {
     origin !== expected ||
     request.headers.get("sec-fetch-site") === "cross-site"
   )
-    throw new Error("Same-origin request required");
+    throw new PublicError("Same-origin request required");
   if (!request.headers.get("content-type")?.startsWith("application/json"))
-    throw new Error("JSON required");
+    throw new PublicError("JSON required");
 }
 export function mutation(request: NextRequest): Session {
   sameOrigin(request);
   const s = session(request);
   if (request.headers.get("x-csrf-token") !== s.csrf)
-    throw new Error("Invalid request token");
+    throw new PublicError("Invalid request token");
   return s;
 }
 export async function body(request: NextRequest): Promise<unknown> {
   // Bound actual streamed bytes, not only the caller-controlled Content-Length header.
   const reader = request.body?.getReader();
-  if (!reader) throw new Error("Request body required");
+  if (!reader) throw new PublicError("Request body required");
   const chunks: Uint8Array[] = [];
   let total = 0;
   for (;;) {
@@ -38,28 +39,13 @@ export async function body(request: NextRequest): Promise<unknown> {
     total += value.byteLength;
     if (total > 65536) {
       await reader.cancel();
-      throw new Error("Request too large");
+      throw new PublicError("Request too large");
     }
     chunks.push(value);
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 export function failure(error: unknown) {
-  if (error instanceof Error && error.message === "Sign in required")
-    return NextResponse.json({ error: "Sign in required" }, { status: 401 });
-  // Never expose SQL, filesystem paths, or submitted financial payloads.
-  const message =
-    error instanceof Error &&
-    !/SQLITE|constraint|database|JSON|Unexpected/i.test(error.message)
-      ? error.message
-      : "Request could not be completed";
-  return NextResponse.json(
-    {
-      error:
-        message.length < 300
-          ? message
-          : "Invalid input. Check the form fields.",
-    },
-    { status: 400 },
-  );
+  const result = publicFailure(error);
+  return NextResponse.json({ error: result.error }, { status: result.status });
 }

@@ -43,13 +43,18 @@ npm run build
 npx playwright install --with-deps chromium
 npm run test:e2e
 npm audit --omit=dev
+npm audit
 ```
 
 With installed Chromium: `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e`. Browser tests use port 3100 and a separate fabricated-only `data/e2e.sqlite`; never point tests at customer data. Tests use unique synthetic identities and do not delete existing databases. CI creates its own fresh database.
 
+The full dependency audit currently fails with 16 moderate development-tool findings in the lint dependency chain; the production-only audit reports zero. This is recorded as an unresolved release gate, and CI now checks both. Do not run `npm audit fix --force` or suppress the findings to manufacture a passing result; see the re-audit for compatibility evidence.
+
 Build compiles but never publishes. Production mode sets Secure cookies and requires HTTPS; use `npm run dev` for local HTTP interaction. No hosting workflow is included.
 
 ## Readiness
+
+The next staged implementation prompt is [CODEX_PRIVATE_BETA_PROMPT.md](docs/CODEX_PRIVATE_BETA_PROMPT.md). Read the [prelaunch re-audit](docs/PRELAUNCH_AUDIT.md) for reproduced issues, corrections, expanded tests and the current **NO-GO** decision for real-user hosting/public launch. This prompt is future work, not a completed migration or deployment.
 
 See [architecture](docs/ARCHITECTURE.md), [data model](docs/DATA_MODEL.md), [financial conventions](docs/FINANCIAL_ENGINE.md), [security](docs/SECURITY.md), [test plan](docs/TEST_PLAN.md), and [release status](docs/RELEASE_STATUS.md).
 

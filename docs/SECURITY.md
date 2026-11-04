@@ -12,6 +12,8 @@ Approval checks immutable proposal ID/version/server-serialized digest, exact be
 
 Human/AI principal is server-issued, not a request assertion. There is **no active AI adapter**. Future AI adapters may only create typed drafts/scenarios, cannot receive human cookies/CSRF/challenges or unrestricted browser/HTTP tools. Software cannot prove human intent against a compromised browser/XSS/stolen session. No biometric assurance is claimed. Both gesture and accessible UI use the same backend verification.
 
+The re-audit added digest recomputation against stored proposal contents at review and commit, transactional discard/challenge invalidation, and a second live-session check inside the commit transaction. Unexpected HTTP exceptions are now hidden by default; only explicitly public application errors are returned. These controls have regression/failure-injection tests, but hosted database-role and multi-worker concurrency verification remain open. See PRELAUNCH_AUDIT.md.
+
 | Risk                                   | Current local policy                                  | Before real use                         |
 | -------------------------------------- | ----------------------------------------------------- | --------------------------------------- |
 | Ordinary transaction/category/budget   | Session + explicit independent review + challenge     | Independent review and abuse tests      |

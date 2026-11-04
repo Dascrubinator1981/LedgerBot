@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PublicError } from "./errors";
 
 export const MAX_MONEY = 100_000_000_000;
 export const minor = z.number().int().min(-MAX_MONEY).max(MAX_MONEY);
@@ -140,19 +141,43 @@ export type FinanceState = {
 
 export function parseMoney(text: string): number {
   if (!/^-?\d{1,10}(\.\d{1,2})?$/.test(text))
-    throw new Error("Enter dollars with at most two decimal places");
+    throw new PublicError("Enter dollars with at most two decimal places");
   const negative = text.startsWith("-");
   const [whole, fraction = ""] = text.replace("-", "").split(".");
   const value = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
   return minor.parse(negative ? -value : value);
 }
-export const money = (value: number | null) =>
-  value === null
-    ? "Not set up yet"
-    : new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-      }).format(value / 100);
+const currencyFormat = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+export function sumMoney(values: Iterable<number>): number {
+  let total = 0n;
+  for (const value of values) {
+    if (!Number.isSafeInteger(value))
+      throw new PublicError("Money must use safe integer cents");
+    total += BigInt(value);
+  }
+  if (
+    total > BigInt(Number.MAX_SAFE_INTEGER) ||
+    total < BigInt(Number.MIN_SAFE_INTEGER)
+  )
+    throw new PublicError("Total exceeds the supported money range");
+  return Number(total);
+}
+export function money(value: number | null): string {
+  if (value === null) return "Not set up yet";
+  if (!Number.isSafeInteger(value))
+    throw new PublicError("Money must use safe integer cents");
+  const absolute = BigInt(Math.abs(value)),
+    whole = absolute / 100n;
+  const signedWhole = value < 0 ? (whole === 0n ? -0 : -whole) : whole;
+  const fraction = (absolute % 100n).toString().padStart(2, "0");
+  return currencyFormat
+    .formatToParts(signedWhole)
+    .map((part) => (part.type === "fraction" ? fraction : part.value))
+    .join("");
+}
 export const liability = (account: Account) =>
   ["credit", "loan", "liability"].includes(account.type);
 // Ledger amounts use net-worth sign for all accounts. UI displays liabilities as positive owed.
@@ -162,9 +187,9 @@ export function balance(
   through = "9999-12-31",
 ): number | null {
   if (account.opening === null || through < account.asOf) return null;
-  const signed =
-    (liability(account) ? -account.opening : account.opening) +
-    transactions
+  const signed = sumMoney([
+    liability(account) ? -account.opening : account.opening,
+    ...transactions
       .filter(
         (t) =>
           t.accountId === account.id &&
@@ -172,8 +197,9 @@ export function balance(
           t.date > account.asOf &&
           t.date <= through,
       )
-      .reduce((sum, t) => sum + t.amount, 0);
-  return liability(account) ? -signed : signed;
+      .map((t) => t.amount),
+  ]);
+  return signed === 0 ? 0 : liability(account) ? -signed : signed;
 }
 export function netWorth(
   accounts: Account[],
@@ -184,9 +210,8 @@ export function netWorth(
     accounts.some((a) => balance(a, transactions) === null)
   )
     return null;
-  return accounts.reduce(
-    (sum, a) => sum + balance(a, transactions)! * (liability(a) ? -1 : 1),
-    0,
+  return sumMoney(
+    accounts.map((a) => balance(a, transactions)! * (liability(a) ? -1 : 1)),
   );
 }
 export function budgetActual(
@@ -194,14 +219,17 @@ export function budgetActual(
   month: string,
   transactions: Transaction[],
 ): number {
-  return -transactions
-    .filter(
-      (t) =>
-        t.status === "cleared" && !t.transferId && t.date.startsWith(month),
-    )
-    .flatMap((t) => t.splits)
-    .filter((s) => s.categoryId === categoryId)
-    .reduce((sum, s) => sum + s.amount, 0);
+  const actual = sumMoney(
+    transactions
+      .filter(
+        (t) =>
+          t.status === "cleared" && !t.transferId && t.date.startsWith(month),
+      )
+      .flatMap((t) => t.splits)
+      .filter((s) => s.categoryId === categoryId)
+      .map((s) => s.amount),
+  );
+  return actual === 0 ? 0 : -actual;
 }
 export function addDays(day: string, count: number): string {
   const d = new Date(`${day}T00:00:00Z`);
@@ -234,6 +262,9 @@ export function forecast(
   today: string,
   horizon = 30,
 ) {
+  date.parse(today);
+  if (!Number.isInteger(horizon) || horizon < 1 || horizon > 366)
+    throw new PublicError("Forecast horizon must be between 1 and 366 days");
   const cash = state.accounts.filter((a) =>
     ["checking", "savings", "cash"].includes(a.type),
   );
@@ -246,15 +277,29 @@ export function forecast(
     amount: number;
     state: "estimated" | "pending";
   }[] = [];
-  for (const rule of state.recurrences.filter((r) =>
+  const cashRules = state.recurrences.filter((r) =>
     cash.some((a) => a.id === r.accountId),
-  )) {
-    for (let index = 0; index < 10000; index++) {
+  );
+  const end = addDays(today, horizon);
+  for (const rule of cashRules) {
+    // Jump to the first future clearing date instead of traversing years of history.
+    let low = 0,
+      high = 10000;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      const candidate = addDays(
+        nextOccurrence(rule.start, rule.cadence, middle),
+        rule.clearingDays,
+      );
+      if (candidate <= today) low = middle + 1;
+      else high = middle;
+    }
+    for (let index = low; index < 10000; index++) {
       const day = addDays(
         nextOccurrence(rule.start, rule.cadence, index),
         rule.clearingDays,
       );
-      if (day > addDays(today, horizon)) break;
+      if (day > end) break;
       if (day > today)
         events.push({
           date: day,
@@ -275,31 +320,31 @@ export function forecast(
     });
   const start = unknown
     ? null
-    : cash.reduce((sum, a) => sum + balance(a, state.transactions, today)!, 0);
+    : sumMoney(cash.map((a) => balance(a, state.transactions, today)!));
+  const amountsByDate = new Map<string, number[]>();
+  for (const event of events) {
+    const amounts = amountsByDate.get(event.date) || [];
+    amounts.push(event.amount);
+    amountsByDate.set(event.date, amounts);
+  }
+  let running = start;
   const days = Array.from({ length: horizon + 1 }, (_, i) => {
     const day = addDays(today, i);
-    return {
-      date: day,
-      amount:
-        start === null
-          ? null
-          : start +
-            events
-              .filter((e) => e.date <= day)
-              .reduce((sum, e) => sum + e.amount, 0),
-    };
+    if (running !== null)
+      running = sumMoney([running, ...(amountsByDate.get(day) || [])]);
+    return { date: day, amount: running };
   });
   const warnings = [
     "Preliminary estimate: no bank verification, holiday adjustment, or discretionary spending assumptions.",
-    "Recurring items are estimates only; mark received/paid separately and retire or update schedules to avoid stale assumptions.",
+    "Recurring matching and schedule editing are not implemented. Estimates may overlap pending or recorded activity; do not rely on this forecast for real financial decisions.",
   ];
   if (unknown)
     warnings.push(
       "Add dated cash opening balances to calculate a cash forecast.",
     );
-  if (!state.recurrences.some((r) => r.amount > 0))
+  if (!cashRules.some((r) => r.amount > 0))
     warnings.push("No recurring income is configured.");
-  if (!state.recurrences.some((r) => r.amount < 0))
+  if (!cashRules.some((r) => r.amount < 0))
     warnings.push("No recurring bills are configured.");
   if (days.some((d) => d.amount !== null && d.amount < 0))
     warnings.push(
