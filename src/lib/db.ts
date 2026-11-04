@@ -1,0 +1,85 @@
+import { DatabaseSync } from "node:sqlite";
+import { mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+
+export function openDatabase(
+  path = process.env.LEDGERBOT_DATABASE_PATH || "./data/ledgerbot.sqlite",
+) {
+  if (path !== ":memory:")
+    mkdirSync(dirname(resolve(path)), { recursive: true, mode: 0o700 });
+  const db = new DatabaseSync(path);
+  db.exec(
+    "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;",
+  );
+  migrate(db);
+  return db;
+}
+export function migrate(db: DatabaseSync) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS users(
+      id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL,
+      revision INTEGER NOT NULL DEFAULT 0, setup TEXT NOT NULL DEFAULT 'needs-review',
+      promotions INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS sessions(
+      hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), expires INTEGER NOT NULL,
+      csrf TEXT NOT NULL, principal TEXT NOT NULL CHECK(principal IN ('human','ai'))
+    );
+    CREATE TABLE IF NOT EXISTS accounts(
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), data TEXT NOT NULL,
+      UNIQUE(id,user_id)
+    );
+    CREATE TABLE IF NOT EXISTS categories(
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), data TEXT NOT NULL,
+      UNIQUE(id,user_id)
+    );
+    CREATE TABLE IF NOT EXISTS transfers(
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), UNIQUE(id,user_id)
+    );
+    CREATE TABLE IF NOT EXISTS transactions(
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), account_id TEXT NOT NULL,
+      transfer_id TEXT, data TEXT NOT NULL, UNIQUE(id,user_id),
+      FOREIGN KEY(account_id,user_id) REFERENCES accounts(id,user_id),
+      FOREIGN KEY(transfer_id,user_id) REFERENCES transfers(id,user_id)
+    );
+    CREATE TABLE IF NOT EXISTS allocations(
+      transaction_id TEXT NOT NULL, user_id TEXT NOT NULL, category_id TEXT NOT NULL,
+      amount INTEGER NOT NULL CHECK(typeof(amount)='integer'),
+      FOREIGN KEY(transaction_id,user_id) REFERENCES transactions(id,user_id) ON DELETE CASCADE,
+      FOREIGN KEY(category_id,user_id) REFERENCES categories(id,user_id)
+    );
+    CREATE TABLE IF NOT EXISTS budgets(
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), category_id TEXT NOT NULL,
+      month TEXT NOT NULL, data TEXT NOT NULL, UNIQUE(user_id,category_id,month),
+      FOREIGN KEY(category_id,user_id) REFERENCES categories(id,user_id)
+    );
+    CREATE TABLE IF NOT EXISTS recurrences(
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), account_id TEXT NOT NULL, data TEXT NOT NULL,
+      FOREIGN KEY(account_id,user_id) REFERENCES accounts(id,user_id)
+    );
+    CREATE TABLE IF NOT EXISTS reconciliations(
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), account_id TEXT NOT NULL, data TEXT NOT NULL,
+      FOREIGN KEY(account_id,user_id) REFERENCES accounts(id,user_id)
+    );
+    CREATE TABLE IF NOT EXISTS proposals(
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), data TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS challenges(
+      hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), session_hash TEXT NOT NULL REFERENCES sessions(hash),
+      proposal_id TEXT NOT NULL REFERENCES proposals(id), digest TEXT NOT NULL, version INTEGER NOT NULL,
+      expires INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS receipts(
+      proposal_id TEXT PRIMARY KEY REFERENCES proposals(id), user_id TEXT NOT NULL REFERENCES users(id),
+      idempotency_key TEXT NOT NULL, data TEXT NOT NULL, UNIQUE(user_id,idempotency_key)
+    );
+    CREATE TABLE IF NOT EXISTS audit(
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), proposal_id TEXT NOT NULL, event TEXT NOT NULL, created INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS auth_attempts(key TEXT PRIMARY KEY, count INTEGER NOT NULL, reset_at INTEGER NOT NULL);
+    INSERT OR IGNORE INTO schema_migrations(version) VALUES(1);
+  `);
+}
+let singleton: DatabaseSync | undefined;
+export const database = () => (singleton ??= openDatabase());
