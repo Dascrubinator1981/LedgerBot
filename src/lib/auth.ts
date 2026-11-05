@@ -7,7 +7,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { z } from "zod";
+import { z } from "./schema";
 
 export const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");

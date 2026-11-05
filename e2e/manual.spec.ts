@@ -352,6 +352,23 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
   ).toBeVisible();
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await page
+    .getByText("Investigate a statement difference", { exact: true })
+    .click();
+  await page
+    .getByLabel("Investigate account", { exact: true })
+    .selectOption({ label: "Synthetic checking · checking" });
+  await page.getByLabel("Investigate through date").fill("2026-01-31");
+  await page.getByLabel("Balance to investigate ($)").fill("950");
+  await page
+    .getByRole("button", { name: "Investigate without saving" })
+    .click();
+  await expect(page.getByText(/Statement minus ledger:/)).toContainText(
+    "$5.00",
+  );
+  expect(
+    (await (await page.request.get("/api/state")).json()).transactions,
+  ).toEqual(after.transactions);
+  await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Synthetic checking · checking" });
   await page
@@ -363,6 +380,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
     .click();
   await approve(page);
   const final = await (await page.request.get("/api/state")).json();
+  expect(final.reconciliations).toHaveLength(1);
   const checkingId = final.accounts.find(
     (a: { name: string }) => a.name === "Synthetic checking",
   ).id;

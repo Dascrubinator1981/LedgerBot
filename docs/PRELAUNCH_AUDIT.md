@@ -1,3 +1,5 @@
+> Current staged implementation: see [STAGED_IMPLEMENTATION_REPORT.md](STAGED_IMPLEMENTATION_REPORT.md), [Stage 1](STAGE_1_REPORT.md), [Stage 2](STAGE_2_REPORT.md), [Stage 3](STAGE_3_REPORT.md), and [operations](OPERATIONS.md). The original milestone/audit below is historical; later reports supersede its feature-status statements.
+
 # LedgerBot prelaunch re-audit
 
 ## Decision

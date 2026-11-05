@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./schema";
 export const reminderSchema = z.object({
   status: z.enum(["active", "dismissed", "not-applicable", "snoozed"]),
   until: z.number().int().nonnegative().max(8640000000000000).optional(),

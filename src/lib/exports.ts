@@ -9,6 +9,7 @@ export function financialExport(state: FinanceState, includeDrafts = false) {
     budgets: state.budgets,
     recurrences: state.recurrences,
     occurrences: state.occurrences || [],
+    reconciliations: state.reconciliations || [],
     preferences: state.settings,
     ...(includeDrafts ? { proposals: state.proposals } : {}),
   };

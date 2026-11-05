@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { z } from "@/lib/schema";
 import { authenticate } from "@/lib/auth";
 import { database } from "@/lib/db";
 import { body, COOKIE, failure, mutation, sameOrigin } from "@/lib/http";

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./schema";
 import { PublicError } from "./errors";
 
 export const MAX_MONEY = 100_000_000_000;
@@ -212,6 +212,13 @@ export type FinanceState = {
   budgets: Budget[];
   recurrences: Recurrence[];
   occurrences?: Occurrence[];
+  reconciliations?: {
+    id: string;
+    accountId: string;
+    date: string;
+    statement: number;
+    transactionIds: string[];
+  }[];
   proposals: Proposal[];
   revision: number;
   settings: {

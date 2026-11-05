@@ -39,6 +39,7 @@ import {
   type Section as Tab,
 } from "@/lib/navigation";
 import { SetupReminders } from "./setup-reminders";
+import { ReconciliationInvestigator } from "./reconciliation-investigator";
 
 export default function Workspace() {
   const [state, setState] = useState<FinanceState | null>(null),
@@ -698,6 +699,11 @@ export default function Workspace() {
                 </div>
               </form>
             </section>
+            <ReconciliationInvestigator
+              key={state.revision}
+              state={state}
+              today={today()}
+            />
             <details>
               <summary>
                 Rename or correct existing accounts and categories

@@ -69,6 +69,7 @@ test("verified identity, PostgreSQL ledger and second-user isolation work togeth
   browser,
 }) => {
   await signup(page, `verified-${crypto.randomUUID()}@example.test`);
+  expect((await page.request.get("/api/health?ready=1")).status()).toBe(200);
   let data = await (await page.request.get("/api/state")).json();
   for (const key of [
     "accounts",

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { z } from "zod";
+import { z } from "@/lib/schema";
 import { confirm } from "@/lib/finance";
 import { body } from "@/lib/http";
 import { withFinance } from "@/lib/backend";

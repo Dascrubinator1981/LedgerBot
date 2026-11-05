@@ -24,9 +24,17 @@ function databasePool() {
       ssl: local ? false : { rejectUnauthorized: true },
       max: 10,
       connectionTimeoutMillis: 5000,
+      query_timeout: 5000,
     });
   }
   return pool;
+}
+export async function postgresReady() {
+  const result = await databasePool().query(
+    "SELECT (SELECT count(*)::integer FROM ledgerbot.schema_migrations WHERE version BETWEEN 1 AND 6) AS versions,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user",
+  );
+  const row = result.rows[0];
+  return row?.versions === 6 && !row.rolsuper && !row.rolbypassrls;
 }
 export class PostgresDatabase implements FinanceDb {
   private savepoint = false;

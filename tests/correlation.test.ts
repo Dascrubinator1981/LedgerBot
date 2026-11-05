@@ -6,6 +6,7 @@ import { authenticate, getSession, type Session } from "../src/lib/auth";
 import { propose, review, confirm, state } from "../src/lib/finance";
 import {
   balance,
+  civilToday,
   budgetActual,
   forecast,
   type Operation,
@@ -75,6 +76,34 @@ async function setup(amount = -1000, start = "2026-01-20") {
   };
 }
 describe("shared ledger, budget, forecast and paid-bill contract", () => {
+  it("retains refund classification through a pending-to-cleared edit", async () => {
+    const { accountId, categoryId } = await setup();
+    await post({
+      kind: "transaction",
+      accountId,
+      date: "2026-01-10",
+      description: "Synthetic refund",
+      amount: 100,
+      flow: "refund",
+      status: "pending",
+      splits: [{ categoryId, amount: 100 }],
+    });
+    const original = (await current()).transactions[0];
+    await post({
+      kind: "editTransaction",
+      id: original.id,
+      accountId,
+      date: "2026-01-11",
+      description: "Synthetic refund cleared",
+      amount: 100,
+      status: "cleared",
+      splits: original.splits,
+    });
+    const s = await current();
+    expect(s.transactions[0].flow).toBe("refund");
+    expect(s.transactions[0].id).toBe(original.id);
+    expect(budgetProgress(s, "2026-01", "2026-01-15").totalActual).toBe(-100);
+  });
   it("edits a transfer pair atomically without changing its identity or counting spending", async () => {
     const { accountId } = await setup();
     await post({
@@ -380,6 +409,17 @@ describe("shared ledger, budget, forecast and paid-bill contract", () => {
   });
 });
 describe("paid-bill date window and deterministic running balances", () => {
+  it("uses the user's civil day across midnight and DST transitions", () => {
+    expect(
+      civilToday("America/Los_Angeles", new Date("2026-03-08T07:30:00Z")),
+    ).toBe("2026-03-07");
+    expect(
+      civilToday("America/Los_Angeles", new Date("2026-03-08T10:30:00Z")),
+    ).toBe("2026-03-08");
+    expect(
+      civilToday("Pacific/Kiritimati", new Date("2026-11-05T12:30:00Z")),
+    ).toBe("2026-11-06");
+  });
   it("uses seven inclusive civil dates and excludes expenses, future items and pending", () => {
     const recurrenceId = randomUUID(),
       accountId = randomUUID();

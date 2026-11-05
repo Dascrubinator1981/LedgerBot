@@ -15,7 +15,10 @@
     "local:services": "node scripts/local-services.mjs",
     "test:postgres": "node scripts/test-postgres.mjs",
     "test:e2e:postgres": "node scripts/test-postgres.mjs --e2e",
-    "dev:postgres": "node scripts/dev-postgres.mjs"
+    "dev:postgres": "node scripts/dev-postgres.mjs",
+    "test:recovery": "node scripts/test-recovery.mjs",
+    "test:e2e:production": "playwright test --config=playwright.production.config.ts",
+    "check:secrets": "node scripts/check-secrets.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

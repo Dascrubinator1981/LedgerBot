@@ -32,7 +32,8 @@ type Table =
   | "budgets"
   | "recurrences"
   | "proposals"
-  | "occurrences";
+  | "occurrences"
+  | "reconciliations";
 async function records<T>(
   db: FinanceDb,
   table: Table,
@@ -99,6 +100,9 @@ export async function state(
     budgets: await records<Budget>(db, "budgets", userId),
     recurrences: await records<Recurrence>(db, "recurrences", userId),
     occurrences: await records<Occurrence>(db, "occurrences", userId),
+    reconciliations: await records<
+      NonNullable<FinanceState["reconciliations"]>[number]
+    >(db, "reconciliations", userId),
     proposals: includeProposals
       ? await records<Proposal>(db, "proposals", userId)
       : [],

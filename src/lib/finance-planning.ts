@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z } from "./schema";
 import {
   addDays,
   civilToday,
@@ -36,6 +36,14 @@ export async function normalizePlanning(
   userId: string,
   op: Operation,
 ): Promise<Operation> {
+  if (op.kind === "editTransaction" && op.flow === undefined) {
+    const row = (await db
+      .prepare("SELECT data FROM transactions WHERE id=? AND user_id=?")
+      .get(op.id, userId)) as { data: string } | undefined;
+    const original = row ? (JSON.parse(row.data) as Transaction) : undefined;
+    // Retain a refund classification when a pending entry is edited without reclassifying it.
+    if (original?.flow) op = { ...op, flow: original.flow };
+  }
   if (op.kind === "transaction" || op.kind === "editTransaction")
     op = { ...op, flow: op.flow || (op.amount < 0 ? "expense" : "income") };
   if (op.kind === "restoreTransaction")
