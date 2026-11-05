@@ -1,3 +1,4 @@
+import { inlineCategoryFlow } from "./helpers/inline-category-flow";
 import { correlationFlow } from "./helpers/correlation-flow";
 import { test, expect, type Page } from "@playwright/test";
 async function signup(page: Page) {
@@ -396,4 +397,11 @@ test("approved bill payment keeps ledger, budget charts and forecast in agreemen
 }) => {
   await signup(page);
   await correlationFlow(page);
+});
+
+test("inline category review preserves ledger and budget work", async ({
+  page,
+}) => {
+  await signup(page);
+  await inlineCategoryFlow(page);
 });

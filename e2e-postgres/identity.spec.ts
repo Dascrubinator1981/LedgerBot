@@ -1,3 +1,4 @@
+import { inlineCategoryFlow } from "../e2e/helpers/inline-category-flow";
 import { correlationFlow } from "../e2e/helpers/correlation-flow";
 import {
   test,
@@ -197,4 +198,11 @@ test("verified PostgreSQL paid bills and budget charts maintain the shared contr
 }) => {
   await signup(page, `correlation-${crypto.randomUUID()}@example.test`);
   await correlationFlow(page);
+});
+
+test("verified inline category review preserves unfinished financial entries", async ({
+  page,
+}) => {
+  await signup(page, `inline-${crypto.randomUUID()}@example.test`);
+  await inlineCategoryFlow(page);
 });

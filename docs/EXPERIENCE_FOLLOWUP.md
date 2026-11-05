@@ -1,5 +1,7 @@
 # Experience follow-up — agreed scope and first slice
 
+Latest follow-up: [inline category creation](INLINE_CATEGORY_REPORT.md) now implements part of the reusable-selector work. The graph checkpoint and original next-slice list below remain historical context.
+
 These decisions come from the owner's follow-up conversation and supplement the original product documents. They do not authorize deployment, paid activation or bank/payment actions.
 
 ## Budget graph drill-down — implemented in this slice

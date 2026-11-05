@@ -15,6 +15,7 @@ import {
   type Proposal,
   type Transaction,
 } from "@/lib/domain";
+import { CategorySelect } from "./category-select";
 export const dollars = (value: number) =>
   `${value < 0 ? "-" : ""}${Math.floor(Math.abs(value) / 100)}.${String(Math.abs(value) % 100).padStart(2, "0")}`;
 export function Field({
@@ -84,9 +85,13 @@ export function AccountSelect({
 export function SplitFields({
   state,
   edit,
+  onCreateCategory,
+  busy,
 }: {
   state: FinanceState;
   edit: Transaction | null;
+  onCreateCategory?: (name: string) => void;
+  busy?: boolean;
 }) {
   const [count, setCount] = useState(Math.max(1, edit?.splits.length || 0));
   return (
@@ -100,19 +105,14 @@ export function SplitFields({
       </p>
       {Array.from({ length: count }, (_, i) => (
         <div className="fields" key={i}>
-          <Field label={`Split ${i + 1} category`}>
-            <select
-              name={`category-${i}`}
-              defaultValue={edit?.splits[i]?.categoryId || ""}
-            >
-              <option value="">Unassigned</option>
-              {state.categories.map((c) => (
-                <option value={c.id} key={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <CategorySelect
+            categories={state.categories}
+            name={`category-${i}`}
+            label={`Split ${i + 1} category`}
+            value={edit?.splits[i]?.categoryId || ""}
+            busy={busy}
+            onCreate={onCreateCategory}
+          />
           <Input
             label={`Split ${i + 1} signed amount ($)`}
             name={`splitAmount-${i}`}

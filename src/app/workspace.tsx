@@ -40,6 +40,7 @@ import {
 } from "@/lib/navigation";
 import { SetupReminders } from "./setup-reminders";
 import { BudgetExplorer } from "./budget-explorer";
+import { CategorySelect } from "./category-select";
 import { ReconciliationInvestigator } from "./reconciliation-investigator";
 
 export default function Workspace() {
@@ -832,7 +833,14 @@ export default function Workspace() {
                     <option value="refund">Refund of spending</option>
                   </select>
                 </Field>
-                <SplitFields state={state} edit={edit} />
+                <SplitFields
+                  state={state}
+                  edit={edit}
+                  busy={busy}
+                  onCreateCategory={(name) =>
+                    void run(() => prepare({ kind: "category", name }))
+                  }
+                />
                 <OccurrenceFields
                   state={state}
                   current={edit?.occurrence}
@@ -1146,16 +1154,16 @@ export default function Workspace() {
                 }
               >
                 <div className="fields">
-                  <Field label="Budget category">
-                    <select name="categoryId" required>
-                      <option value="">Choose category</option>
-                      {state.categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                  <CategorySelect
+                    categories={state.categories}
+                    name="categoryId"
+                    label="Budget category"
+                    required
+                    busy={busy}
+                    onCreate={(name) =>
+                      void run(() => prepare({ kind: "category", name }))
+                    }
+                  />
                   <Input
                     label="Budget month"
                     name="month"
