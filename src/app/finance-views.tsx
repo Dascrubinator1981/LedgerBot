@@ -7,11 +7,15 @@ export function BudgetCharts({
   month,
   today,
   onMonth,
+  onOpen,
+  filtered = false,
 }: {
   state: FinanceState;
   month: string;
   today: string;
   onMonth: (month: string) => void;
+  onOpen?: () => void;
+  filtered?: boolean;
 }) {
   const id = useId(),
     data = budgetProgress(state, month, today);
@@ -38,19 +42,54 @@ export function BudgetCharts({
           Chart month
           <input
             type="month"
+            min="2000-01"
+            max="2100-12"
             value={month}
             onChange={(e) => {
-              if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value))
+              if (/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(e.target.value))
                 onMonth(e.target.value);
             }}
           />
         </label>
       </div>
-      {!data.configured ? (
+      {onOpen && (
         <p>
-          No monthly plan is set up for this month. Add your own category
-          targets to begin.
+          <a
+            href={`/?section=budget&month=${month}`}
+            onClick={(event) => {
+              if (
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+              )
+                return;
+              event.preventDefault();
+              onOpen();
+            }}
+          >
+            View and filter this budget
+          </a>
         </p>
+      )}
+      {filtered && <p>Selected view totals — not your overall budget.</p>}
+      {!data.configured ? (
+        <div>
+          <p>
+            No monthly plan is set up for this month. Add your own category
+            targets to begin.
+          </p>
+          {state.transactions.length > 0 && (
+            <p>
+              Cleared spending without a selected target:{" "}
+              <strong data-testid="budget-actual">
+                {money(data.totalActual)}
+              </strong>
+              . Pending spending: {money(data.pending)}. An on-plan comparison
+              is unavailable.
+            </p>
+          )}
+        </div>
       ) : (
         <>
           <p className="pill" data-testid="budget-status">
@@ -76,7 +115,7 @@ export function BudgetCharts({
             <small>
               Income and internal transfers are excluded. Uncategorized spending
               ({money(data.uncategorized)}) and spending in categories without
-              targets ({money(data.unbudgeted)}) are included in the overall
+              targets ({money(data.unbudgeted)}) are included in this chart’s
               total. Pending spending ({money(data.pending)}) is separate.
             </small>
           </p>
@@ -86,51 +125,71 @@ export function BudgetCharts({
               before relying on this comparison.
             </p>
           )}
-          <svg
-            viewBox="0 0 640 210"
-            role="img"
-            aria-labelledby={`${id}-title ${id}-description`}
-            className="finance-chart"
+          <a
+            href={onOpen ? `/?section=budget&month=${month}` : undefined}
+            aria-label={onOpen ? "Open budget filters from graph" : undefined}
+            onClick={
+              onOpen
+                ? (event) => {
+                    if (
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    )
+                      return;
+                    event.preventDefault();
+                    onOpen();
+                  }
+                : undefined
+            }
           >
-            <title id={`${id}-title`}>
-              Cumulative spending compared with monthly plan
-            </title>
-            <desc id={`${id}-description`}>
-              Dashed line is a straight-line pacing assumption, not extra money
-              or a guarantee. Solid line is approved cleared spending through
-              today. Exact values are available below.
-            </desc>
-            <line
-              x1="40"
-              x2="600"
-              y1={y(0)}
-              y2={y(0)}
-              stroke="currentColor"
-              opacity=".5"
-            />
-            <polyline
-              points={planned}
-              fill="none"
-              stroke="#c7adff"
-              strokeWidth="3"
-              strokeDasharray="7 5"
-            />
-            <polyline
-              points={actual}
-              fill="none"
-              stroke="#66e5ca"
-              strokeWidth="3"
-            />
-            <text x="40" y="20" fill="currentColor" fontSize="12">
-              {money(maximum)}
-            </text>
-            <text x="40" y="201" fill="currentColor" fontSize="12">
-              {month}-01
-            </text>
-            <text x="510" y="201" fill="currentColor" fontSize="12">
-              {data.series.at(-1)?.date}
-            </text>
-          </svg>
+            <svg
+              viewBox="0 0 640 210"
+              role="img"
+              aria-labelledby={`${id}-title ${id}-description`}
+              className="finance-chart"
+            >
+              <title id={`${id}-title`}>
+                Cumulative spending compared with monthly plan
+              </title>
+              <desc id={`${id}-description`}>
+                Dashed line is a straight-line pacing assumption, not extra
+                money or a guarantee. Solid line is approved cleared spending
+                through today. Exact values are available below.
+              </desc>
+              <line
+                x1="40"
+                x2="600"
+                y1={y(0)}
+                y2={y(0)}
+                stroke="currentColor"
+                opacity=".5"
+              />
+              <polyline
+                points={planned}
+                fill="none"
+                stroke="#c7adff"
+                strokeWidth="3"
+                strokeDasharray="7 5"
+              />
+              <polyline
+                points={actual}
+                fill="none"
+                stroke="#66e5ca"
+                strokeWidth="3"
+              />
+              <text x="40" y="20" fill="currentColor" fontSize="12">
+                {money(maximum)}
+              </text>
+              <text x="40" y="201" fill="currentColor" fontSize="12">
+                {month}-01
+              </text>
+              <text x="510" y="201" fill="currentColor" fontSize="12">
+                {data.series.at(-1)?.date}
+              </text>
+            </svg>
+          </a>
           <p>
             Solid: cleared spending · Dashed: even daily plan pace. “Ahead of
             planned pace” is not the same as exceeding the monthly limit.

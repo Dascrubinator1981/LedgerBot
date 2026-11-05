@@ -39,6 +39,7 @@ import {
   type Section as Tab,
 } from "@/lib/navigation";
 import { SetupReminders } from "./setup-reminders";
+import { BudgetExplorer } from "./budget-explorer";
 import { ReconciliationInvestigator } from "./reconciliation-investigator";
 
 export default function Workspace() {
@@ -131,6 +132,11 @@ export default function Workspace() {
   useEffect(() => {
     const navigate = () => {
       updateTab(sectionFromUrl(new URL(location.href)));
+      {
+        const month = new URL(location.href).searchParams.get("month");
+        if (month && /^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(month))
+          setBudgetMonth(month);
+      }
       setReview(null);
     };
     const channel =
@@ -197,6 +203,11 @@ export default function Workspace() {
           setCsrf(result.csrf);
           setAuthProvider(result.authProvider);
           updateTab(sectionFromUrl(new URL(location.href)));
+          {
+            const month = new URL(location.href).searchParams.get("month");
+            if (month && /^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(month))
+              setBudgetMonth(month);
+          }
           if (
             new URLSearchParams(window.location.search).get("recovery") === "1"
           )
@@ -227,6 +238,12 @@ export default function Workspace() {
     await refresh();
     const r = await api("review", "POST", { id: proposal.id });
     setReview({ ...r, key: approvalKey(proposal.id) });
+  }
+  function changeBudgetMonth(month: string) {
+    setBudgetMonth(month);
+    const url = new URL(location.href);
+    url.searchParams.set("month", month);
+    history.replaceState(null, "", url);
   }
   function approvalKey(id: string) {
     const name = `ledgerbot-approval:${id}`;
@@ -566,7 +583,15 @@ export default function Workspace() {
               state={state}
               month={chartMonth}
               today={today()}
-              onMonth={setBudgetMonth}
+              onMonth={changeBudgetMonth}
+              onOpen={() => {
+                setTab("Budget");
+                history.replaceState(
+                  null,
+                  "",
+                  `/?section=budget&month=${chartMonth}`,
+                );
+              }}
             />
             <section className="card">
               <h2>Pip’s notes</h2>
@@ -1070,11 +1095,11 @@ export default function Workspace() {
         )}
         {tab === "Budget" && (
           <>
-            <BudgetCharts
+            <BudgetExplorer
               state={state}
               month={chartMonth}
               today={today()}
-              onMonth={setBudgetMonth}
+              onMonth={changeBudgetMonth}
             />
             <section className="card">
               <h2>Your categories</h2>
@@ -1105,9 +1130,10 @@ export default function Workspace() {
             <section className="card">
               <h2>Monthly PLAN</h2>
               <p>
-                Targets are intentions. Spending comparisons come from approved,
-                cleared allocations. Uncategorized spending is excluded and must
-                be reviewed in the Ledger.
+                Targets are intentions. Category rows compare approved, cleared
+                allocations. The overall chart also includes uncategorized
+                spending. These planning controls show your full plan; filters
+                above apply to the chart and matching entries.
               </p>
               <form
                 onSubmit={(e) =>

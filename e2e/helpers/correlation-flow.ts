@@ -98,6 +98,46 @@ export async function correlationFlow(page: Page) {
   await expect(page.getByTestId("budget-status")).toHaveText("Over budget");
   await page.getByRole("link", { name: "Dashboard", exact: true }).click();
   await expect(page.getByTestId("budget-actual")).toHaveText("$105.00");
+  const original = await (await page.request.get("/api/state")).json();
+  await page
+    .getByRole("link", { name: "Open budget filters from graph", exact: true })
+    .click();
+  await expect(page).toHaveURL(/section=budget&month=\d{4}-\d{2}/);
+  await expect(
+    page.getByRole("heading", { name: "Explore your budget" }),
+  ).toBeVisible();
+  await page
+    .getByRole("checkbox", { name: "Correlation bills", exact: true })
+    .uncheck();
+  await expect(page.getByTestId("budget-actual")).toHaveText("$5.00");
+  await expect(page.getByTestId("budget-status")).toHaveCount(0);
+  await page
+    .getByRole("checkbox", { name: "Uncategorized", exact: true })
+    .uncheck();
+  await expect(page.getByTestId("budget-actual")).toHaveCount(0);
+  await expect(
+    page.getByText("No spending matches these filters."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Clear budget filters" }).click();
+  await expect(page.getByTestId("budget-actual")).toHaveText("$105.00");
+  expect(await (await page.request.get("/api/state")).json()).toEqual(original);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Explore your budget" }),
+  ).toBeVisible();
+  await expect(page.getByTestId("budget-actual")).toHaveText("$105.00");
+  const chartMonth = await page
+    .getByLabel("Chart month", { exact: true })
+    .inputValue();
+  const anotherMonth =
+    chartMonth.slice(0, 4) + (chartMonth.endsWith("-01") ? "-02" : "-01");
+  await page.getByLabel("Chart month", { exact: true }).fill(anotherMonth);
+  await page.reload();
+  await expect(page.getByLabel("Chart month", { exact: true })).toHaveValue(
+    anotherMonth,
+  );
+  await page.getByLabel("Chart month", { exact: true }).fill(chartMonth);
+  await expect(page.getByTestId("budget-actual")).toHaveText("$105.00");
   await page.getByRole("link", { name: "Forecaster", exact: true }).click();
   const recent = page.locator(".card").filter({
     has: page.getByRole("heading", {
