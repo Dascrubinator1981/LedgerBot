@@ -31,22 +31,22 @@ Charts, planning forms, reminders, export and statement investigation are separa
 
 Final serial browser results are recorded below. Earlier checkpoint evidence is in [Stage 1](STAGE_1_REPORT.md), [Stage 2](STAGE_2_REPORT.md) and [Stage 3](STAGE_3_REPORT.md). Historical release/audit documents describe the earlier milestone, not current feature status.
 
-| Executed check                                                                      | Observed result                                                                                                                             |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm ci`                                                                            | Passed on final repeat from the committed lockfile                                                          |
-| `npm run db:migrate` twice                                                          | Both passed on final repeat, schema version 4; existing development data preserved                                                   |
-| `npm run typecheck`, `npm run lint`                                                 | Passed on the expanded code                                                                                                                 |
-| `npm test`                                                                          | **86 passed across 9 files**, no skips                                                                                                      |
-| `npm run build`                                                                     | Passed; compiled production server, no deployment                                                                                           |
-| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e:production` | **1 passed**: nonce uniqueness, hydrated controls, no observed CSP violations, health and unconfigured production fail-closed behavior      |
-| `npm run test:postgres`                                                             | **10 passed** in real local PostgreSQL/crypto suite; all migrations run twice                                                               |
-| `npm run test:recovery`                                                             | Passed on final rerun: encrypted file restore, tamper/wrong-key rejection, exact balance/schema, restored RLS and reader write denial       |
-| `npm audit --omit=dev`                                                              | **0 reported vulnerabilities**                                                                                                              |
-| `npm audit`                                                                         | **8 moderate development-chain findings remain**; no high or critical findings. This gate fails                                             |
-| `npm run check:secrets`                                                             | Tracked-file pattern guard passed; final staged-file rerun recorded at handoff. This is a limited guard, not independent scanning assurance |
-| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e`            | **7 passed**, including statement investigation, old card/reconciliation/approval invariants, accessibility and cross-tab updates           |
-| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e:postgres`   | **3 passed**, including real local verified signup/recovery, readiness, isolation and shared finance correlations                           |
-| GitHub CI                                                                           | Remote result unverified; local tests are not remote CI evidence                                                                            |
+| Executed check                                                                      | Observed result                                                                                                                        |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm ci`                                                                            | Passed on final repeat from the committed lockfile                                                                                     |
+| `npm run db:migrate` twice                                                          | Both passed on final repeat, schema version 4; existing development data preserved                                                     |
+| `npm run typecheck`, `npm run lint`                                                 | Passed on the expanded code                                                                                                            |
+| `npm test`                                                                          | **86 passed across 9 files**, no skips                                                                                                 |
+| `npm run build`                                                                     | Passed; compiled production server, no deployment                                                                                      |
+| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e:production` | **1 passed**: nonce uniqueness, hydrated controls, no observed CSP violations, health and unconfigured production fail-closed behavior |
+| `npm run test:postgres`                                                             | **10 passed** in real local PostgreSQL/crypto suite; all migrations run twice                                                          |
+| `npm run test:recovery`                                                             | Passed on final rerun: encrypted file restore, tamper/wrong-key rejection, exact balance/schema, restored RLS and reader write denial  |
+| `npm audit --omit=dev`                                                              | **0 reported vulnerabilities**                                                                                                         |
+| `npm audit`                                                                         | **8 moderate development-chain findings remain**; no high or critical findings. This gate fails                                        |
+| `npm run check:secrets`                                                             | Passed for all 104 tracked/staged files on the final code. This is a limited guard, not independent scanning assurance                 |
+| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e`            | **7 passed**, including statement investigation, old card/reconciliation/approval invariants, accessibility and cross-tab updates      |
+| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e:postgres`   | **3 passed**, including real local verified signup/recovery, readiness, isolation and shared finance correlations                      |
+| GitHub CI                                                                           | Remote result unverified; local tests are not remote CI evidence                                                                       |
 
 Current compatible patches reduced the previous 16 lint-chain findings to 8. The remaining advisory is GHSA-g3hv-75wg-m249: the current TypeScript-ESLint parser depends on minimatch 10; the advisory requires 11.0.1 or later. The latest compatible parser still declares `^10.2.2`. No incompatible major override, forced ESLint downgrade, rule removal or advisory suppression was used. React, accessibility and TypeScript lint rules remain enabled.
 
@@ -67,3 +67,11 @@ Use invented identities and values. Create a checking snapshot of $1,000 dated b
 3. **P2 — product/scale completeness:** finish the remaining stage work above, paginate backend history, profile representative schedule-heavy datasets, expand financial scenario coverage, and obtain owner/legal review of draft policies and operating responsibilities.
 
 Reviewable work is on `feat/manual-finance-foundation`. PR creation and remote CI verification depend on GitHub API access; if denied, use the repository compare link rather than claiming a PR exists. A separate explicit release decision is required after a concrete hosted candidate and all blocking evidence are reviewed.
+
+## Review handoff
+
+All four checkpoint commits were pushed successfully. Remote `main` remains `43809fa3220a8361b3315e05a48c9354b1a6e6e6` (the initial README); none of this work is merged or deployed. The separate GitHub Pages checkout remains unchanged.
+
+`gh pr create --repo Dascrubinator1981/LedgerBot --base main --head feat/manual-finance-foundation --title ... --body-file /tmp/ledgerbot-pr-body.md` failed with `Post "https://api.github.com/graphql": Forbidden`. Native Git read/push succeeded; the GitHub API operation is denied in this environment. No PR was created, and remote CI status could not be verified. Do not supply a token in chat. The next review action is enabling the appropriate GitHub API access in environment settings or opening [the branch comparison](https://github.com/Dascrubinator1981/LedgerBot/compare/main...feat/manual-finance-foundation?expand=1) and creating the review PR there.
+
+Final startup verification: `npm run local:services` successfully reused the local services and applied the final schema; `npm run dev:postgres` launched the app. Its readiness endpoint returned 200/`ready`, and anonymous `/api/state` returned 401. This validates the current local machine, not a new restored cloud task or hosted project. Reusable install/start instructions are saved separately for environment review; saving them does not publish the app or environment.
