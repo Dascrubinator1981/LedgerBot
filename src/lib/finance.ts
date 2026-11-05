@@ -79,13 +79,16 @@ export async function state(
   includeProposals = true,
 ): Promise<FinanceState> {
   const user = (await db
-    .prepare("SELECT revision,setup,promotions,timezone FROM users WHERE id=?")
+    .prepare(
+      "SELECT revision,setup,promotions,timezone,reminders FROM users WHERE id=?",
+    )
     .get(userId)) as
     | {
         revision: number;
         setup: string;
         promotions: number;
         timezone: string;
+        reminders: string;
       }
     | undefined;
   if (!user) throw new PublicError("Sign in required");
@@ -104,6 +107,7 @@ export async function state(
       setup: user.setup,
       promotions: !!user.promotions,
       timezone: user.timezone,
+      reminders: JSON.parse(user.reminders),
     },
   };
 }

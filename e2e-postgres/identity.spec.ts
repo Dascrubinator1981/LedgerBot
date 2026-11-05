@@ -78,7 +78,7 @@ test("verified identity, PostgreSQL ledger and second-user isolation work togeth
     "recurrences",
   ])
     expect(data[key]).toEqual([]);
-  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Verified synthetic cash");
@@ -90,7 +90,7 @@ test("verified identity, PostgreSQL ledger and second-user isolation work togeth
     .getByRole("button", { name: "Prepare account for review" })
     .click();
   await approve(page);
-  await page.getByRole("button", { name: "Ledger", exact: true }).click();
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Verified synthetic cash · checking" });
@@ -107,7 +107,7 @@ test("verified identity, PostgreSQL ledger and second-user isolation work togeth
     page.getByRole("cell", { name: "$85.00", exact: true }),
   ).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Ledger", exact: true }).click();
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
   await expect(
     page.getByRole("cell", { name: "$85.00", exact: true }),
   ).toBeVisible();

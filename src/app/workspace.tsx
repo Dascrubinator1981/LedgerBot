@@ -32,30 +32,20 @@ import {
   occurrenceInput,
 } from "./planning-forms";
 import { runningBalances } from "@/lib/insights";
-type Tab =
-  | "Dashboard"
-  | "Accounts"
-  | "Ledger"
-  | "Budget"
-  | "Forecaster"
-  | "Inbox"
-  | "Settings";
-const tabs: Tab[] = [
-  "Dashboard",
-  "Accounts",
-  "Ledger",
-  "Budget",
-  "Forecaster",
-  "Inbox",
-  "Settings",
-];
+import {
+  sections as tabs,
+  sectionFromUrl,
+  sectionHref,
+  type Section as Tab,
+} from "@/lib/navigation";
+import { SetupReminders } from "./setup-reminders";
 
 export default function Workspace() {
   const [state, setState] = useState<FinanceState | null>(null),
     [csrf, setCsrf] = useState(""),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<Tab>("Dashboard"),
+  const [tab, updateTab] = useState<Tab>("Dashboard"),
     [mode, setMode] = useState<"login" | "signup" | "recover">("signup"),
     [notice, setNotice] = useState(""),
     [error, setError] = useState("");
@@ -99,6 +89,12 @@ export default function Workspace() {
       ),
     [state],
   );
+  const updates = useRef<BroadcastChannel | null>(null);
+  const requestSequence = useRef(0);
+  function setTab(next: Tab) {
+    updateTab(next);
+    history.pushState(null, "", sectionHref(next));
+  }
   const guard = useRef(false);
   async function api(path: string, method = "GET", payload?: unknown) {
     const response = await fetch(`/api/${path}`, {
@@ -116,16 +112,77 @@ export default function Workspace() {
         setCsrf("");
         setReview(null);
         setEdit(null);
+        setTransferEdit(null);
       }
       throw new Error(result.error || result.message || "Request failed");
     }
+    if (method !== "GET" && path !== "review")
+      updates.current?.postMessage("invalidate");
     return result;
   }
   async function refresh() {
+    const sequence = ++requestSequence.current;
     const result = await api("state");
+    if (sequence !== requestSequence.current) return;
     setState(result);
     setCsrf(result.csrf);
   }
+  useEffect(() => {
+    const navigate = () => {
+      updateTab(sectionFromUrl(new URL(location.href)));
+      setReview(null);
+    };
+    const channel =
+      typeof BroadcastChannel !== "undefined"
+        ? new BroadcastChannel("ledgerbot-invalidations")
+        : null;
+    updates.current = channel;
+    const invalidate = async () => {
+      if (guard.current) return;
+      const sequence = ++requestSequence.current;
+      try {
+        const response = await fetch("/api/state", { cache: "no-store" });
+        if (sequence !== requestSequence.current) return;
+        if (response.status === 401) {
+          setState(null);
+          setCsrf("");
+          setReview(null);
+          setEdit(null);
+          setTransferEdit(null);
+        } else if (response.ok) {
+          const result = await response.json();
+          if (sequence === requestSequence.current) {
+            setState(result);
+            setCsrf(result.csrf);
+          }
+        } else
+          setError(
+            "Could not refresh records. Displayed values may be out of date; retry before relying on them.",
+          );
+      } catch {
+        setError(
+          "Connection unavailable. Displayed values may be out of date.",
+        );
+      }
+    };
+    const visible = () => {
+      if (document.visibilityState === "visible") void invalidate();
+    };
+    if (channel)
+      channel.onmessage = (event) => {
+        if (event.data === "invalidate") void invalidate();
+      };
+    window.addEventListener("popstate", navigate);
+    window.addEventListener("focus", invalidate);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      channel?.close();
+      updates.current = null;
+      window.removeEventListener("popstate", navigate);
+      window.removeEventListener("focus", invalidate);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, []);
   useEffect(() => {
     void fetch("/api/config")
       .then((r) => r.json())
@@ -138,6 +195,7 @@ export default function Workspace() {
           setState(result);
           setCsrf(result.csrf);
           setAuthProvider(result.authProvider);
+          updateTab(sectionFromUrl(new URL(location.href)));
           if (
             new URLSearchParams(window.location.search).get("recovery") === "1"
           )
@@ -326,17 +384,26 @@ export default function Workspace() {
         </div>
         <nav aria-label="Main navigation">
           {tabs.map((t) => (
-            <button
+            <a
+              href={sectionHref(t)}
               key={t}
               aria-current={tab === t ? "page" : undefined}
-              onClick={() => {
+              onClick={(event) => {
+                if (
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey
+                )
+                  return;
+                event.preventDefault();
                 setTab(t);
                 setEdit(null);
               }}
             >
               {t}
               {t === "Inbox" && pending.length ? ` (${pending.length})` : ""}
-            </button>
+            </a>
           ))}
         </nav>
         <footer>
@@ -1189,7 +1256,7 @@ export default function Workspace() {
               </p>
               {pending.length ? (
                 pending.map((p) => (
-                  <article key={p.id} className="card">
+                  <article key={p.id} id={`proposal-${p.id}`} className="card">
                     <div className="row">
                       <div>
                         <h3>
@@ -1217,6 +1284,13 @@ export default function Workspace() {
                         >
                           Review exact changes
                         </button>
+                        <a
+                          href={
+                            sectionHref("Inbox", p.id) + `#proposal-${p.id}`
+                          }
+                        >
+                          Link to this draft
+                        </a>
                         <button
                           disabled={busy}
                           onClick={() =>
@@ -1430,6 +1504,18 @@ export default function Workspace() {
                 </button>
               </div>
             </section>
+            <SetupReminders
+              state={state}
+              busy={busy}
+              navigate={setTab}
+              save={(reminders) =>
+                void run(async () => {
+                  await api("state", "PATCH", { ...state.settings, reminders });
+                  await refresh();
+                  setNotice("Reminder preference saved.");
+                })
+              }
+            />
             <section className="card">
               <h2>Integration status</h2>
               {[

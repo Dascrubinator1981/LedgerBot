@@ -35,7 +35,7 @@ test("two users, empty start, reviewed account, expense, reload, and isolation",
   ).toBeVisible();
   await expect(page.getByText("$0.00", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Skip setup", exact: true }).click();
-  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Fictional pocket");
@@ -52,7 +52,7 @@ test("two users, empty start, reviewed account, expense, reload, and isolation",
   const uncommitted = await page.request.get("/api/state");
   expect((await uncommitted.json()).accounts).toHaveLength(0);
   await approve(page);
-  await page.getByRole("button", { name: "Ledger", exact: true }).click();
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Fictional pocket · checking" });
@@ -67,7 +67,7 @@ test("two users, empty start, reviewed account, expense, reload, and isolation",
     page.getByRole("cell", { name: "$85.00", exact: true }),
   ).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Ledger", exact: true }).click();
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
   await expect(
     page.getByRole("cell", { name: /Fictional snack/ }),
   ).toBeVisible();
@@ -99,7 +99,7 @@ test("cancelled review stays a draft, keyboard confirmation saves known zero", a
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signup(page);
-  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await page.getByLabel("Account name", { exact: true }).fill("Zero pocket");
   await page
     .getByLabel("Opening balance ($, positive owed for liabilities)")
@@ -115,7 +115,7 @@ test("cancelled review stays a draft, keyboard confirmation saves known zero", a
   expect(
     (await (await page.request.get("/api/state")).json()).accounts,
   ).toHaveLength(0);
-  await page.getByRole("button", { name: /Inbox/ }).click();
+  await page.getByRole("link", { name: /Inbox/ }).click();
   await page.getByRole("button", { name: "Review exact changes" }).click();
   const dialog = page.getByRole("dialog");
   await dialog
@@ -127,7 +127,7 @@ test("cancelled review stays a draft, keyboard confirmation saves known zero", a
     .focus();
   await page.keyboard.press("Enter");
   await expect(dialog).not.toBeVisible();
-  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await expect(
     page.locator(".amount").getByText("$0.00", { exact: true }),
   ).toBeVisible();
@@ -137,7 +137,7 @@ test("slide requires release and aborted slide cannot commit", async ({
   page,
 }) => {
   await signup(page);
-  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await page.getByLabel("Account name", { exact: true }).fill("Gesture pocket");
   await page
     .getByLabel("Opening balance ($, positive owed for liabilities)")
@@ -195,7 +195,7 @@ test("successful commit receipt survives a failed balance refresh", async ({
   page,
 }) => {
   await signup(page);
-  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Refresh test pocket");
@@ -226,7 +226,7 @@ test("successful commit receipt survives a failed balance refresh", async ({
   ).toHaveLength(1);
   await page.unroute("**/api/state");
   await page.reload();
-  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Refresh test pocket", exact: true }),
   ).toBeVisible();
@@ -237,7 +237,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
 }) => {
   await signup(page);
   async function addAccount(name: string, type: string, opening: string) {
-    await page.getByRole("button", { name: "Accounts", exact: true }).click();
+    await page.getByRole("link", { name: "Accounts", exact: true }).click();
     await page.getByLabel("Account name", { exact: true }).fill(name);
     await page.getByLabel("Account type", { exact: true }).selectOption(type);
     await page
@@ -253,14 +253,14 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
   await addAccount("Synthetic card", "credit", "50");
   await addAccount("Synthetic savings", "savings", "0");
   for (const name of ["Synthetic food", "Synthetic home"]) {
-    await page.getByRole("button", { name: "Budget", exact: true }).click();
+    await page.getByRole("link", { name: "Budget", exact: true }).click();
     await page.getByLabel("New category name").fill(name);
     await page
       .getByRole("button", { name: "Prepare category", exact: true })
       .click();
     await approve(page);
   }
-  await page.getByRole("button", { name: "Ledger", exact: true }).click();
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Synthetic card · credit" });
@@ -304,7 +304,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
     await page.getByRole("button", { name: "Prepare paired transfer" }).click();
     await approve(page);
   }
-  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
   for (const [name, amount] of [
     ["Synthetic checking", "$945.00"],
     ["Synthetic card", "$40.00"],
@@ -317,7 +317,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
         .locator(".amount"),
     ).toHaveText(amount);
   }
-  await page.getByRole("button", { name: "Budget", exact: true }).click();
+  await page.getByRole("link", { name: "Budget", exact: true }).click();
   await page
     .getByLabel("Budget category", { exact: true })
     .selectOption({ label: "Synthetic food" });
@@ -329,7 +329,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
     page.getByText("Cleared actuals: $12.00", { exact: true }),
   ).toBeVisible();
   const before = await (await page.request.get("/api/state")).json();
-  await page.getByRole("button", { name: "Forecaster", exact: true }).click();
+  await page.getByRole("link", { name: "Forecaster", exact: true }).click();
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Synthetic checking · checking" });
@@ -350,7 +350,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
   await expect(
     page.getByText("Preliminary / incomplete coverage", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Synthetic checking · checking" });

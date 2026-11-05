@@ -1,0 +1,4 @@
+BEGIN;
+ALTER TABLE ledgerbot.users ADD COLUMN IF NOT EXISTS reminders TEXT NOT NULL DEFAULT '{}';
+INSERT INTO ledgerbot.schema_migrations(version) VALUES(5) ON CONFLICT DO NOTHING;
+COMMIT;

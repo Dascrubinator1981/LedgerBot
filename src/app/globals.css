@@ -154,12 +154,12 @@ nav {
   display: grid;
   gap: 0.4rem;
 }
-nav button {
+nav a {
   text-align: left;
   background: transparent;
   border-color: transparent;
 }
-nav button[aria-current="page"] {
+nav a[aria-current="page"] {
   background: #243a52;
   color: var(--accent);
   border-color: #37665f;
@@ -404,7 +404,7 @@ td button {
     display: flex;
     overflow: auto;
   }
-  nav button {
+  nav a {
     white-space: nowrap;
   }
   .sidebar footer {
@@ -424,4 +424,11 @@ td button {
   * {
     scroll-behavior: auto !important;
   }
+}
+
+nav a {
+  text-decoration: none;
+  color: inherit;
+  border-radius: 0.5rem;
+  padding: 0.7rem 1rem;
 }

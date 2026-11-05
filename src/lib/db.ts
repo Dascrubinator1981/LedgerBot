@@ -88,6 +88,10 @@ export function migrate(db: DatabaseSync) {
     db.exec(
       "ALTER TABLE users ADD COLUMN timezone TEXT NOT NULL DEFAULT 'Etc/UTC'",
     );
+  if (!columns("users").includes("reminders"))
+    db.exec(
+      "ALTER TABLE users ADD COLUMN reminders TEXT NOT NULL DEFAULT '{}'",
+    );
   if (!columns("sessions").includes("created_at"))
     db.exec(
       "ALTER TABLE sessions ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0",
@@ -99,6 +103,7 @@ export function migrate(db: DatabaseSync) {
     CREATE TRIGGER IF NOT EXISTS occurrence_owner_insert BEFORE INSERT ON transactions WHEN json_extract(NEW.data,'$.occurrence.recurrenceId') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM recurrences WHERE id=json_extract(NEW.data,'$.occurrence.recurrenceId') AND user_id=NEW.user_id) BEGIN SELECT RAISE(ABORT,'Foreign schedule reference'); END;
     CREATE TRIGGER IF NOT EXISTS occurrence_owner_update BEFORE UPDATE OF data ON transactions WHEN json_extract(NEW.data,'$.occurrence.recurrenceId') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM recurrences WHERE id=json_extract(NEW.data,'$.occurrence.recurrenceId') AND user_id=NEW.user_id) BEGIN SELECT RAISE(ABORT,'Foreign schedule reference'); END;
     INSERT OR IGNORE INTO schema_migrations(version) VALUES(3);
+    INSERT OR IGNORE INTO schema_migrations(version) VALUES(4);
   `);
 }
 let singleton: DatabaseSync | undefined;

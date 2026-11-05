@@ -214,7 +214,12 @@ export type FinanceState = {
   occurrences?: Occurrence[];
   proposals: Proposal[];
   revision: number;
-  settings: { setup: string; promotions: boolean; timezone?: string };
+  settings: {
+    setup: string;
+    promotions: boolean;
+    timezone?: string;
+    reminders?: import("./reminders").Reminders;
+  };
 };
 export const timezoneSchema = z
   .string()

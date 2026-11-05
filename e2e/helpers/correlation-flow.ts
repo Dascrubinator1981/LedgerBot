@@ -13,7 +13,7 @@ async function approve(page: Page) {
 export async function correlationFlow(page: Page) {
   const today = new Date().toISOString().slice(0, 10),
     month = today.slice(0, 7);
-  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Correlation pocket");
@@ -25,7 +25,7 @@ export async function correlationFlow(page: Page) {
     .getByRole("button", { name: "Prepare account for review" })
     .click();
   await approve(page);
-  await page.getByRole("button", { name: "Budget", exact: true }).click();
+  await page.getByRole("link", { name: "Budget", exact: true }).click();
   await page.getByLabel("New category name").fill("Correlation bills");
   await page
     .getByRole("button", { name: "Prepare category", exact: true })
@@ -38,7 +38,7 @@ export async function correlationFlow(page: Page) {
   await page.getByLabel("Planned target ($)").fill("100");
   await page.getByRole("button", { name: "Prepare budget target" }).click();
   await approve(page);
-  await page.getByRole("button", { name: "Forecaster", exact: true }).click();
+  await page.getByRole("link", { name: "Forecaster", exact: true }).click();
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Correlation pocket · checking" });
@@ -49,7 +49,7 @@ export async function correlationFlow(page: Page) {
     .getByRole("button", { name: "Prepare recurring assumption" })
     .click();
   await approve(page);
-  await page.getByRole("button", { name: "Ledger", exact: true }).click();
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
   async function enter(description: string, amount: string, link: boolean) {
     await page
       .getByLabel("Account", { exact: true })
@@ -93,12 +93,12 @@ export async function correlationFlow(page: Page) {
   expect(after.forecast.days[0].amount).toBe(89500);
   expect(after.recentBills).toHaveLength(1);
   expect(after.recentBills[0].amount).toBe(10000);
-  await page.getByRole("button", { name: "Budget", exact: true }).click();
+  await page.getByRole("link", { name: "Budget", exact: true }).click();
   await expect(page.getByTestId("budget-actual")).toHaveText("$105.00");
   await expect(page.getByTestId("budget-status")).toHaveText("Over budget");
-  await page.getByRole("button", { name: "Dashboard", exact: true }).click();
+  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
   await expect(page.getByTestId("budget-actual")).toHaveText("$105.00");
-  await page.getByRole("button", { name: "Forecaster", exact: true }).click();
+  await page.getByRole("link", { name: "Forecaster", exact: true }).click();
   const recent = page.locator(".card").filter({
     has: page.getByRole("heading", {
       name: "Bill payments in the last 7 days",
@@ -111,7 +111,7 @@ export async function correlationFlow(page: Page) {
   await expect(
     recent.getByRole("cell", { name: "$100.00", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Ledger", exact: true }).click();
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
   const row = page
     .getByRole("row")
     .filter({ hasText: "Approved correlation payment" });
@@ -122,7 +122,7 @@ export async function correlationFlow(page: Page) {
   expect(after.recentBills).toEqual([]);
   expect(after.forecast.opening).toBe(99500);
   expect(after.forecast.days[0].amount).toBe(89500);
-  await page.getByRole("button", { name: /Inbox/ }).click();
+  await page.getByRole("link", { name: /Inbox/ }).click();
   await page
     .getByRole("button", { name: "Review undo deletion", exact: true })
     .click();
@@ -131,7 +131,7 @@ export async function correlationFlow(page: Page) {
   expect(after.budget.totalActual).toBe(10500);
   expect(after.recentBills).toHaveLength(1);
   expect(after.forecast.opening).toBe(89500);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page
     .getByRole("button", { name: "Review export", exact: true })
     .click();
