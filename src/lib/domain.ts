@@ -19,14 +19,37 @@ const id = z.uuid();
 const name = z.string().trim().min(1).max(100);
 const status = z.enum(["pending", "cleared"]);
 export const splitSchema = z.object({ categoryId: id, amount: minor });
+export const occurrenceRefSchema = z.object({
+  recurrenceId: id,
+  dueDate: date,
+  settles: z.boolean(),
+});
 const transactionFields = {
+  flow: z.enum(["income", "expense", "refund"]).optional(),
   accountId: id,
   date,
   description: name,
   amount: minor.refine((v) => v !== 0, "Amount cannot be zero"),
   status,
   splits: z.array(splitSchema).max(50),
+  occurrence: occurrenceRefSchema.nullable().optional(),
 };
+const recurrenceFields = {
+  accountId: id,
+  name,
+  amount: minor.refine((v) => v !== 0),
+  start: date,
+  cadence: z.enum(["weekly", "biweekly", "monthly"]),
+  clearingDays: z.number().int().min(0).max(30),
+};
+export const transactionRecordSchema = z
+  .object({
+    id,
+    ...transactionFields,
+    transferId: id.nullable(),
+    reconciledAt: date.nullable(),
+  })
+  .passthrough();
 export const operationSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("account"),
@@ -55,6 +78,7 @@ export const operationSchema = z.discriminatedUnion("kind", [
     date,
     description: name,
     status,
+    occurrence: occurrenceRefSchema.nullable().optional(),
   }),
   z.object({
     kind: z.literal("budget"),
@@ -77,6 +101,47 @@ export const operationSchema = z.discriminatedUnion("kind", [
     date,
     statement: minor,
   }),
+  z.object({ kind: z.literal("renameAccount"), id, name }),
+  z.object({ kind: z.literal("renameCategory"), id, name }),
+  z.object({
+    kind: z.literal("correctOpening"),
+    id,
+    opening: minor.nullable(),
+    asOf: date,
+  }),
+  z.object({ kind: z.literal("editRecurrence"), id, ...recurrenceFields }),
+  z.object({ kind: z.literal("pauseRecurrence"), id, paused: z.boolean() }),
+  z.object({ kind: z.literal("archiveRecurrence"), id }),
+  z.object({
+    kind: z.literal("matchOccurrence"),
+    transactionId: id,
+    ...occurrenceRefSchema.shape,
+  }),
+  z.object({ kind: z.literal("unmatchOccurrence"), transactionId: id }),
+  z.object({
+    kind: z.literal("occurrence"),
+    recurrenceId: id,
+    dueDate: date,
+    expectedClearDate: date,
+    status: z.enum(["unpaid", "skipped"]),
+  }),
+  z.object({ kind: z.literal("settleTransfer"), id, date }),
+  z.object({
+    kind: z.literal("editTransfer"),
+    id,
+    fromId: id,
+    toId: id,
+    amount: minor.refine((v) => v > 0),
+    date,
+    description: name,
+    status,
+    occurrence: occurrenceRefSchema.nullable().optional(),
+  }),
+  z.object({
+    kind: z.literal("restoreTransaction"),
+    sourceProposalId: id,
+    entries: z.array(transactionRecordSchema).max(2).optional(),
+  }),
 ]);
 export type Operation = z.infer<typeof operationSchema>;
 export type Account = {
@@ -88,6 +153,7 @@ export type Account = {
   currency: string;
 };
 export type Transaction = {
+  flow?: "income" | "expense" | "refund";
   id: string;
   accountId: string;
   date: string;
@@ -97,6 +163,7 @@ export type Transaction = {
   transferId: string | null;
   reconciledAt: string | null;
   splits: Split[];
+  occurrence?: z.infer<typeof occurrenceRefSchema> | null;
 };
 export type Split = z.infer<typeof splitSchema>;
 export type Category = { id: string; name: string };
@@ -114,6 +181,16 @@ export type Recurrence = {
   start: string;
   cadence: "weekly" | "biweekly" | "monthly";
   clearingDays: number;
+  active?: boolean;
+  archived?: boolean;
+};
+export type Occurrence = {
+  id: string;
+  recurrenceId: string;
+  dueDate: string;
+  expectedClearDate: string;
+  amount: number;
+  status: "unpaid" | "skipped";
 };
 export type Proposal = {
   id: string;
@@ -134,10 +211,75 @@ export type FinanceState = {
   categories: Category[];
   budgets: Budget[];
   recurrences: Recurrence[];
+  occurrences?: Occurrence[];
   proposals: Proposal[];
   revision: number;
-  settings: { setup: string; promotions: boolean };
+  settings: { setup: string; promotions: boolean; timezone?: string };
 };
+export const timezoneSchema = z
+  .string()
+  .max(100)
+  .refine((value) => {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: value });
+      return true;
+    } catch {
+      return false;
+    }
+  }, "Choose a valid IANA timezone");
+export function civilToday(timezone = "Etc/UTC", now = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  return `${parts.find((p) => p.type === "year")!.value}-${parts.find((p) => p.type === "month")!.value}-${parts.find((p) => p.type === "day")!.value}`;
+}
+export function isOccurrence(rule: Recurrence, dueDate: string): boolean {
+  let low = 0,
+    high = 10000;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if (nextOccurrence(rule.start, rule.cadence, mid) < dueDate) low = mid + 1;
+    else high = mid;
+  }
+  return nextOccurrence(rule.start, rule.cadence, low) === dueDate;
+}
+export function paymentCoverage(
+  transactions: Transaction[],
+  recurrenceId: string,
+  dueDate: string,
+  amount: number,
+) {
+  const matched = transactions.filter(
+    (t) =>
+      t.occurrence?.recurrenceId === recurrenceId &&
+      t.occurrence.dueDate === dueDate,
+  );
+  const cleared = sumMoney(
+      matched
+        .filter((t) => t.status === "cleared")
+        .map((t) => Math.abs(t.amount)),
+    ),
+    pending = sumMoney(
+      matched
+        .filter((t) => t.status === "pending")
+        .map((t) => Math.abs(t.amount)),
+    );
+  const settled = matched.some((t) => t.occurrence?.settles),
+    paid =
+      matched.some((t) => t.status === "cleared" && t.occurrence?.settles) ||
+      cleared >= Math.abs(amount);
+  return {
+    cleared,
+    pending,
+    paid,
+    remaining: settled
+      ? 0
+      : Math.max(0, Math.abs(amount) - sumMoney([cleared, pending])),
+  };
+}
 
 export function parseMoney(text: string): number {
   if (!/^-?\d{1,10}(\.\d{1,2})?$/.test(text))
@@ -223,7 +365,10 @@ export function budgetActual(
     transactions
       .filter(
         (t) =>
-          t.status === "cleared" && !t.transferId && t.date.startsWith(month),
+          t.status === "cleared" &&
+          !t.transferId &&
+          t.flow !== "income" &&
+          t.date.startsWith(month),
       )
       .flatMap((t) => t.splits)
       .filter((s) => s.categoryId === categoryId)
@@ -258,7 +403,10 @@ export function nextOccurrence(
     .slice(0, 10);
 }
 export function forecast(
-  state: Pick<FinanceState, "accounts" | "transactions" | "recurrences">,
+  state: Pick<
+    FinanceState,
+    "accounts" | "transactions" | "recurrences" | "occurrences"
+  >,
   today: string,
   horizon = 30,
 ) {
@@ -281,7 +429,19 @@ export function forecast(
     cash.some((a) => a.id === r.accountId),
   );
   const end = addDays(today, horizon);
-  for (const rule of cashRules) {
+  const scheduled = new Map<
+    string,
+    {
+      rule: Recurrence;
+      dueDate: string;
+      clearDate: string;
+      amount: number;
+      skipped: boolean;
+    }
+  >();
+  for (const rule of cashRules.filter(
+    (r) => r.active !== false && !r.archived,
+  )) {
     // Jump to the first future clearing date instead of traversing years of history.
     let low = 0,
       high = 10000;
@@ -291,7 +451,7 @@ export function forecast(
         nextOccurrence(rule.start, rule.cadence, middle),
         rule.clearingDays,
       );
-      if (candidate <= today) low = middle + 1;
+      if (candidate < today) low = middle + 1;
       else high = middle;
     }
     for (let index = low; index < 10000; index++) {
@@ -300,14 +460,43 @@ export function forecast(
         rule.clearingDays,
       );
       if (day > end) break;
-      if (day > today)
-        events.push({
-          date: day,
-          name: rule.name,
-          amount: rule.amount,
-          state: "estimated",
-        });
+      const dueDate = nextOccurrence(rule.start, rule.cadence, index);
+      scheduled.set(`${rule.id}:${dueDate}`, {
+        rule,
+        dueDate,
+        clearDate: day,
+        amount: rule.amount,
+        skipped: false,
+      });
     }
+  }
+  for (const item of state.occurrences || []) {
+    const rule = cashRules.find((r) => r.id === item.recurrenceId);
+    if (!rule) continue;
+    scheduled.set(`${rule.id}:${item.dueDate}`, {
+      rule,
+      dueDate: item.dueDate,
+      clearDate:
+        item.expectedClearDate < today ? today : item.expectedClearDate,
+      amount: item.amount,
+      skipped: item.status === "skipped",
+    });
+  }
+  for (const event of scheduled.values()) {
+    if (event.skipped || event.clearDate > end) continue;
+    const remainder = paymentCoverage(
+      state.transactions,
+      event.rule.id,
+      event.dueDate,
+      event.amount,
+    ).remaining;
+    if (remainder)
+      events.push({
+        date: event.clearDate,
+        name: event.rule.name,
+        amount: remainder * Math.sign(event.amount),
+        state: "estimated",
+      });
   }
   for (const t of state.transactions.filter(
     (t) => t.status === "pending" && cash.some((a) => a.id === t.accountId),
@@ -336,7 +525,7 @@ export function forecast(
   });
   const warnings = [
     "Preliminary estimate: no bank verification, holiday adjustment, or discretionary spending assumptions.",
-    "Recurring matching and schedule editing are not implemented. Estimates may overlap pending or recorded activity; do not rely on this forecast for real financial decisions.",
+    "Only explicitly matched bill/income payments reduce recurring estimates. Historical untracked or unlinked activity may be incomplete; no merchant-based matching is assumed.",
   ];
   if (unknown)
     warnings.push(
@@ -350,5 +539,5 @@ export function forecast(
     warnings.push(
       "A projected shortage is possible; this does not assert an overdraft occurred.",
     );
-  return { days, events, warnings };
+  return { days, events, warnings, opening: start };
 }

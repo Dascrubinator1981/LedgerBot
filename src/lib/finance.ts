@@ -1,3 +1,11 @@
+import { proposalDigest, verifyDigest } from "./proposal-integrity";
+import {
+  normalizePlanning,
+  validatePlanning,
+  planningBefore,
+  applyPlanning,
+  ensureOccurrence,
+} from "./finance-planning";
 import { PublicError } from "./errors";
 import { randomUUID } from "node:crypto";
 import { financialImpact } from "./preview";
@@ -5,6 +13,8 @@ import type { FinanceDb } from "./finance-db";
 import { hash, secret, type Session } from "./auth";
 import {
   balance,
+  civilToday,
+  type Occurrence,
   operationSchema,
   type Account,
   type Transaction,
@@ -21,7 +31,8 @@ type Table =
   | "categories"
   | "budgets"
   | "recurrences"
-  | "proposals";
+  | "proposals"
+  | "occurrences";
 async function records<T>(
   db: FinanceDb,
   table: Table,
@@ -68,12 +79,13 @@ export async function state(
   includeProposals = true,
 ): Promise<FinanceState> {
   const user = (await db
-    .prepare("SELECT revision,setup,promotions FROM users WHERE id=?")
+    .prepare("SELECT revision,setup,promotions,timezone FROM users WHERE id=?")
     .get(userId)) as
     | {
         revision: number;
         setup: string;
         promotions: number;
+        timezone: string;
       }
     | undefined;
   if (!user) throw new PublicError("Sign in required");
@@ -83,11 +95,16 @@ export async function state(
     categories: await records<Category>(db, "categories", userId),
     budgets: await records<Budget>(db, "budgets", userId),
     recurrences: await records<Recurrence>(db, "recurrences", userId),
+    occurrences: await records<Occurrence>(db, "occurrences", userId),
     proposals: includeProposals
       ? await records<Proposal>(db, "proposals", userId)
       : [],
     revision: user.revision,
-    settings: { setup: user.setup, promotions: !!user.promotions },
+    settings: {
+      setup: user.setup,
+      promotions: !!user.promotions,
+      timezone: user.timezone,
+    },
   };
 }
 async function validate(db: FinanceDb, userId: string, op: Operation) {
@@ -114,7 +131,7 @@ async function validate(db: FinanceDb, userId: string, op: Operation) {
       throw new PublicError(
         "Transaction must be after the opening snapshot date. Same-day entries are already included in that end-of-day snapshot.",
       );
-    if (op.date > new Date().toISOString().slice(0, 10))
+    if (op.date > civilToday(s.settings.timezone))
       throw new PublicError(
         "Use recurring plans for future dates, not actual transactions",
       );
@@ -153,7 +170,7 @@ async function validate(db: FinanceDb, userId: string, op: Operation) {
         "Reconciled entries cannot be deleted. Use a reviewed reversal.",
       );
   }
-  if (op.kind === "account" && op.asOf > new Date().toISOString().slice(0, 10))
+  if (op.kind === "account" && op.asOf > civilToday(s.settings.timezone))
     throw new PublicError("Opening snapshot cannot be in the future");
   if (op.kind === "transfer") {
     if (op.fromId === op.toId)
@@ -164,7 +181,7 @@ async function validate(db: FinanceDb, userId: string, op: Operation) {
     await unlockedDate(to.id, op.date);
     if (op.date <= from.asOf || op.date <= to.asOf)
       throw new PublicError("Transfer must be after both opening snapshots");
-    if (op.date > new Date().toISOString().slice(0, 10))
+    if (op.date > civilToday(s.settings.timezone))
       throw new PublicError("Future transfers are not actuals");
   }
   if (op.kind === "budget")
@@ -173,7 +190,7 @@ async function validate(db: FinanceDb, userId: string, op: Operation) {
   if (op.kind === "reconcile") {
     const a = await account(op.accountId);
     await unlockedDate(a.id, op.date);
-    if (op.date < a.asOf || op.date > new Date().toISOString().slice(0, 10))
+    if (op.date < a.asOf || op.date > civilToday(s.settings.timezone))
       throw new PublicError(
         "Statement date must be between opening date and today",
       );
@@ -182,26 +199,8 @@ async function validate(db: FinanceDb, userId: string, op: Operation) {
         "Statement and cleared ledger differ. Investigate the difference before reconciling.",
       );
   }
+  await validatePlanning(db, userId, op, s);
   return s;
-}
-function proposalDigest(userId: string, p: Proposal): string {
-  return hash(
-    JSON.stringify({
-      id: p.id,
-      version: p.version,
-      operation: p.operation,
-      before: p.before,
-      impact: p.impact,
-      revision: p.revision,
-      userId,
-    }),
-  );
-}
-function verifyDigest(userId: string, p: Proposal) {
-  if (proposalDigest(userId, p) !== p.digest)
-    throw new PublicError(
-      "Proposal integrity check failed. Prepare a new proposal.",
-    );
 }
 function beforeValue(s: FinanceState, op: Operation): unknown {
   if (op.kind === "editTransaction" || op.kind === "deleteTransaction") {
@@ -225,14 +224,18 @@ function beforeValue(s: FinanceState, op: Operation): unknown {
       ),
       through: op.date,
     };
-  return null;
+  return planningBefore(s, op);
 }
 export async function propose(
   db: FinanceDb,
   session: Session,
   input: unknown,
 ): Promise<Proposal> {
-  const op = operationSchema.parse(input);
+  const op = await normalizePlanning(
+    db,
+    session.userId,
+    operationSchema.parse(input),
+  );
   const s = await validate(db, session.userId, op);
   const p: Proposal = {
     id: randomUUID(),
@@ -322,6 +325,20 @@ async function insertTransaction(
 }
 async function apply(db: FinanceDb, userId: string, op: Operation) {
   const id = randomUUID();
+  const current = await state(db, userId, false);
+  if (
+    await applyPlanning(db, userId, current, op, (t) =>
+      insertTransaction(db, userId, t),
+    )
+  )
+    return;
+  if (
+    (op.kind === "transaction" ||
+      op.kind === "editTransaction" ||
+      op.kind === "transfer") &&
+    op.occurrence
+  )
+    await ensureOccurrence(db, userId, current, op.occurrence);
   switch (op.kind) {
     case "account": {
       const a: Account = {
@@ -393,6 +410,7 @@ async function apply(db: FinanceDb, userId: string, op: Operation) {
           transferId: id,
           reconciledAt: null,
           splits: [],
+          ...(amount < 0 && op.occurrence ? { occurrence: op.occurrence } : {}),
         });
       break;
     }
@@ -478,6 +496,16 @@ export async function confirm(
       input.proposalId,
     );
     verifyDigest(session.userId, p);
+    if (p.operation.kind === "correctOpening") {
+      const row = (await db
+        .prepare("SELECT created_at FROM sessions WHERE hash=? AND user_id=?")
+        .get(session.sessionHash, session.userId)) as
+        { created_at: number } | undefined;
+      if (!row || Date.now() - Number(row.created_at) > 300000)
+        throw new PublicError(
+          "Sign in again before correcting an opening snapshot",
+        );
+    }
     const challenge = (await db
       .prepare(
         "SELECT * FROM challenges WHERE hash=? AND user_id=? AND session_hash=? AND proposal_id=?",

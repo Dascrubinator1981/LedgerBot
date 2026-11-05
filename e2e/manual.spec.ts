@@ -1,3 +1,4 @@
+import { correlationFlow } from "./helpers/correlation-flow";
 import { test, expect, type Page } from "@playwright/test";
 async function signup(page: Page) {
   await page.goto("/");
@@ -370,4 +371,11 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
       .filter((t: { accountId: string }) => t.accountId === checkingId)
       .every((t: { reconciledAt: string }) => t.reconciledAt === "2026-01-31"),
   ).toBe(true);
+});
+
+test("approved bill payment keeps ledger, budget charts and forecast in agreement", async ({
+  page,
+}) => {
+  await signup(page);
+  await correlationFlow(page);
 });

@@ -80,6 +80,26 @@ export function migrate(db: DatabaseSync) {
     CREATE TABLE IF NOT EXISTS auth_attempts(key TEXT PRIMARY KEY, count INTEGER NOT NULL, reset_at INTEGER NOT NULL);
     INSERT OR IGNORE INTO schema_migrations(version) VALUES(1);
   `);
+  const columns = (table: string) =>
+    (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
+      (c) => c.name,
+    );
+  if (!columns("users").includes("timezone"))
+    db.exec(
+      "ALTER TABLE users ADD COLUMN timezone TEXT NOT NULL DEFAULT 'Etc/UTC'",
+    );
+  if (!columns("sessions").includes("created_at"))
+    db.exec(
+      "ALTER TABLE sessions ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0",
+    );
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS recurrences_id_owner ON recurrences(id,user_id);
+    CREATE TABLE IF NOT EXISTS occurrences(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),recurrence_id TEXT NOT NULL,due_date TEXT NOT NULL,data TEXT NOT NULL,UNIQUE(user_id,recurrence_id,due_date),FOREIGN KEY(recurrence_id,user_id) REFERENCES recurrences(id,user_id));
+    INSERT OR IGNORE INTO schema_migrations(version) VALUES(2);
+    CREATE TRIGGER IF NOT EXISTS occurrence_owner_insert BEFORE INSERT ON transactions WHEN json_extract(NEW.data,'$.occurrence.recurrenceId') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM recurrences WHERE id=json_extract(NEW.data,'$.occurrence.recurrenceId') AND user_id=NEW.user_id) BEGIN SELECT RAISE(ABORT,'Foreign schedule reference'); END;
+    CREATE TRIGGER IF NOT EXISTS occurrence_owner_update BEFORE UPDATE OF data ON transactions WHEN json_extract(NEW.data,'$.occurrence.recurrenceId') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM recurrences WHERE id=json_extract(NEW.data,'$.occurrence.recurrenceId') AND user_id=NEW.user_id) BEGIN SELECT RAISE(ABORT,'Foreign schedule reference'); END;
+    INSERT OR IGNORE INTO schema_migrations(version) VALUES(3);
+  `);
 }
 let singleton: DatabaseSync | undefined;
 export const database = () => (singleton ??= openDatabase());

@@ -77,12 +77,15 @@ export function authenticate(
 export function createSession(db: DatabaseSync, userId: string) {
   const token = secret(),
     csrf = secret();
-  db.prepare("INSERT INTO sessions VALUES(?,?,?,?,?)").run(
+  db.prepare(
+    "INSERT INTO sessions(hash,user_id,expires,csrf,principal,created_at) VALUES(?,?,?,?,?,?)",
+  ).run(
     hash(token),
     userId,
     Date.now() + 8 * 3600000,
     csrf,
     "human",
+    Date.now(),
   );
   return { token, csrf };
 }

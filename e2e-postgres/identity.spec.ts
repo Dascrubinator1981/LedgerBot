@@ -1,3 +1,4 @@
+import { correlationFlow } from "../e2e/helpers/correlation-flow";
 import {
   test,
   expect,
@@ -188,4 +189,11 @@ test("email recovery changes the password and revokes the other app session", as
     page.getByRole("heading", { name: "Your financial workspace" }),
   ).toBeVisible();
   await other.close();
+});
+
+test("verified PostgreSQL paid bills and budget charts maintain the shared contract", async ({
+  page,
+}) => {
+  await signup(page, `correlation-${crypto.randomUUID()}@example.test`);
+  await correlationFlow(page);
 });

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { state } from "@/lib/finance";
+import { timezoneSchema } from "@/lib/domain";
 import { body } from "@/lib/http";
 import { withFinance } from "@/lib/backend";
 import { postgresMode } from "@/lib/provider-auth";
@@ -26,11 +27,31 @@ export async function PATCH(request: NextRequest) {
           "not-applicable",
         ]),
         promotions: z.boolean(),
+        timezone: timezoneSchema.optional(),
       })
       .parse(await body(request));
-    await db
-      .prepare("UPDATE users SET setup=?,promotions=? WHERE id=?")
-      .run(settings.setup, settings.promotions ? 1 : 0, s.userId);
+    await db.exec("BEGIN IMMEDIATE");
+    try {
+      const old = (await db
+        .prepare("SELECT timezone FROM users WHERE id=?")
+        .get(s.userId)) as { timezone: string };
+      await db
+        .prepare("UPDATE users SET setup=?,promotions=?,timezone=? WHERE id=?")
+        .run(
+          settings.setup,
+          settings.promotions ? 1 : 0,
+          settings.timezone || old.timezone,
+          s.userId,
+        );
+      if (settings.timezone && settings.timezone !== old.timezone)
+        await db
+          .prepare("UPDATE users SET revision=revision+1 WHERE id=?")
+          .run(s.userId);
+      await db.exec("COMMIT");
+    } catch (error) {
+      await db.exec("ROLLBACK");
+      throw error;
+    }
     return { ok: true };
   });
 }

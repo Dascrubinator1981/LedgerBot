@@ -161,9 +161,34 @@ function Diff({ value, state }: { value: unknown; state: FinanceState }) {
     transferId: "Linked transfer ID",
     reconciledAt: "Reconciled through",
     currency: "Currency",
+    recurrenceId: "Bill / income schedule",
+    dueDate: "Scheduled due date",
+    expectedClearDate: "Estimated clearance date",
+    settles: "Confirms this occurrence is settled in full",
+    occurrence: "Bill / income link",
+    transactionId: "Recorded payment",
+    sourceProposalId: "Approved deletion to restore",
+    entries: "Restored records",
+    flow: "Entry type",
+    paused: "Pause future estimates",
+    active: "Active future estimates",
+    archived: "Archived schedule",
+    source: "Prepared by",
   };
   function show(key: string, v: unknown): ReactNode {
-    if (v === null) return "Unknown / not set up";
+    if (v === null)
+      return key === "occurrence"
+        ? "Not linked — ordinary transaction"
+        : "Unknown / not set up";
+    if (typeof v === "boolean") return v ? "Yes" : "No";
+    if (key === "recurrenceId")
+      return state.recurrences.find((r) => r.id === v)?.name || String(v);
+    if (key === "transactionId") {
+      const t = state.transactions.find((t) => t.id === v);
+      return t
+        ? `${t.date} · ${t.description} · ${money(t.amount)}`
+        : String(v);
+    }
     if (
       ["opening", "amount", "target", "statement", "balance"].includes(key) &&
       typeof v === "number"
@@ -182,6 +207,7 @@ function Diff({ value, state }: { value: unknown; state: FinanceState }) {
             </div>
           ))
         : "Uncategorized (no additional balance change)";
+    if (v && typeof v === "object") return <Diff value={v} state={state} />;
     return String(v);
   }
   if (value === null) return <p>No existing record.</p>;
@@ -286,12 +312,31 @@ export function Review({
             balances. Recurring changes affect estimates only; category targets
             compare against actuals without moving money.
           </small>
+          {data.proposal.impact.plan && (
+            <p>
+              Budget {data.proposal.impact.plan.month}: cleared spending{" "}
+              {money(data.proposal.impact.plan.actualBefore)} →{" "}
+              {money(data.proposal.impact.plan.actualAfter)}; target{" "}
+              {money(data.proposal.impact.plan.targetBefore)} →{" "}
+              {money(data.proposal.impact.plan.targetAfter)}.
+            </p>
+          )}
+          {data.proposal.impact.projection && (
+            <p>
+              30-day estimated low cash as of{" "}
+              {data.proposal.impact.projection.asOf}:{" "}
+              {money(data.proposal.impact.projection.lowestBefore)} →{" "}
+              {money(data.proposal.impact.projection.lowestAfter)}. This is a
+              projection, not a cleared bank balance.
+            </p>
+          )}
         </section>
       )}
       {data.proposal.operation.kind === "deleteTransaction" && (
         <p className="notice">
           The entry will be removed from actuals. A linked transfer removes both
-          legs. Undo is not implemented; this preview remains in history.
+          legs. A later reviewed restore is available from Inbox unless a newer
+          snapshot or reconciliation makes restoration unsafe.
         </p>
       )}
       {data.proposal.operation.kind === "transfer" && (

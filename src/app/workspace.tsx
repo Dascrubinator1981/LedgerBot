@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, useMemo, type FormEvent } from "react";
 import {
   Field,
   Input,
@@ -10,6 +10,7 @@ import {
 } from "./components";
 import {
   balance,
+  civilToday,
   budgetActual,
   forecast,
   liability,
@@ -22,6 +23,15 @@ import {
   type Transaction,
 } from "@/lib/domain";
 
+import { BudgetCharts, RecentBills, ForecastChart } from "./finance-views";
+import { ExportPanel } from "./export-panel";
+import {
+  PlanningPanel,
+  AccountTools,
+  OccurrenceFields,
+  occurrenceInput,
+} from "./planning-forms";
+import { runningBalances } from "@/lib/insights";
 type Tab =
   | "Dashboard"
   | "Accounts"
@@ -39,7 +49,7 @@ const tabs: Tab[] = [
   "Inbox",
   "Settings",
 ];
-const today = () => new Date().toISOString().slice(0, 10);
+
 export default function Workspace() {
   const [state, setState] = useState<FinanceState | null>(null),
     [csrf, setCsrf] = useState(""),
@@ -61,6 +71,34 @@ export default function Workspace() {
     [monthFilter, setMonthFilter] = useState("");
   const [horizon, setHorizon] = useState(30);
   const [authProvider, setAuthProvider] = useState("local-development");
+  const [budgetMonth, setBudgetMonth] = useState("");
+  const [transferEdit, setTransferEdit] = useState<Transaction | null>(null);
+  const currentDay = civilToday(state?.settings.timezone);
+  const today = () => currentDay;
+  const sortedTransactions = useMemo(
+    () =>
+      state
+        ? [...state.transactions].sort(
+            (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
+          )
+        : [],
+    [state],
+  );
+  const projected = useMemo(
+    () => (state ? forecast(state, currentDay, horizon) : null),
+    [state, currentDay, horizon],
+  );
+  const runningValues = useMemo(
+    () =>
+      new Map(
+        state
+          ? state.accounts.flatMap((a) => [
+              ...runningBalances(a, state.transactions),
+            ])
+          : [],
+      ),
+    [state],
+  );
   const guard = useRef(false);
   async function api(path: string, method = "GET", payload?: unknown) {
     const response = await fetch(`/api/${path}`, {
@@ -266,10 +304,16 @@ export default function Workspace() {
     );
   const pending = state.proposals.filter((p) => p.status === "awaiting_review");
   const accounts = state.accounts;
-  const transactions = [...state.transactions].sort(
-    (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
-  );
-  const projections = forecast(state, today(), horizon);
+  const transactions = sortedTransactions;
+  const projections = projected!;
+  const chartMonth = budgetMonth || today().slice(0, 7);
+  const running = runningValues;
+  const pairEditing = transferEdit
+    ? transactions.filter((t) => t.transferId === transferEdit.transferId)
+    : [];
+  const pairFrom = pairEditing.find((t) => t.amount < 0),
+    pairTo = pairEditing.find((t) => t.amount > 0);
+
   const currentMonth = today().slice(0, 7);
   return (
     <div className="shell">
@@ -410,9 +454,7 @@ export default function Workspace() {
                 </div>
                 <div className="card">
                   <p className="muted">Cash at opening of forecast</p>
-                  <div className="amount">
-                    {money(projections.days[0].amount)}
-                  </div>
+                  <div className="amount">{money(projections.opening)}</div>
                   <small>Checking, savings and cash · dated snapshots</small>
                 </div>
                 <div className="card">
@@ -452,6 +494,12 @@ export default function Workspace() {
                 </button>
               </section>
             </div>
+            <BudgetCharts
+              state={state}
+              month={chartMonth}
+              today={today()}
+              onMonth={setBudgetMonth}
+            />
             <section className="card">
               <h2>Pip’s notes</h2>
               <p>
@@ -583,6 +631,17 @@ export default function Workspace() {
                 </div>
               </form>
             </section>
+            <details>
+              <summary>
+                Rename or correct existing accounts and categories
+              </summary>
+              <AccountTools
+                state={state}
+                today={today()}
+                busy={busy}
+                submit={submit}
+              />
+            </details>
           </>
         )}
         {tab === "Ledger" && (
@@ -624,6 +683,11 @@ export default function Workspace() {
                       amount,
                       status: str(f, "status") as "pending" | "cleared",
                       splits,
+                      flow:
+                        str(f, "flow") === "auto"
+                          ? undefined
+                          : (str(f, "flow") as "income" | "expense" | "refund"),
+                      occurrence: occurrenceInput(f) || null,
                     } as Operation;
                   })
                 }
@@ -660,7 +724,22 @@ export default function Workspace() {
                     </select>
                   </Field>
                 </div>
+                <Field label="Entry type">
+                  <select name="flow" defaultValue={edit?.flow || "auto"}>
+                    <option value="auto">
+                      Use amount direction (negative expense, positive income)
+                    </option>
+                    <option value="expense">Expense / card purchase</option>
+                    <option value="income">Income / deposit</option>
+                    <option value="refund">Refund of spending</option>
+                  </select>
+                </Field>
                 <SplitFields state={state} edit={edit} />
+                <OccurrenceFields
+                  state={state}
+                  current={edit?.occurrence}
+                  today={today()}
+                />
                 <div className="actions">
                   <button
                     disabled={busy || !accounts.length}
@@ -683,16 +762,24 @@ export default function Workspace() {
                 creates no new income or spending.
               </p>
               <form
+                key={transferEdit?.transferId || "new-transfer"}
                 onSubmit={(e) =>
-                  submit(e, (f) => ({
-                    kind: "transfer",
-                    fromId: str(f, "fromId"),
-                    toId: str(f, "toId"),
-                    amount: parseMoney(str(f, "amount")),
-                    date: str(f, "date"),
-                    description: str(f, "description"),
-                    status: str(f, "status") as "cleared" | "pending",
-                  }))
+                  submit(e, (f) => {
+                    const kind = transferEdit ? "editTransfer" : "transfer";
+                    const editingId = transferEdit?.id;
+                    setTransferEdit(null);
+                    return {
+                      kind,
+                      ...(editingId ? { id: editingId } : {}),
+                      fromId: str(f, "fromId"),
+                      toId: str(f, "toId"),
+                      amount: parseMoney(str(f, "amount")),
+                      date: str(f, "date"),
+                      description: str(f, "description"),
+                      status: str(f, "status") as "cleared" | "pending",
+                      occurrence: occurrenceInput(f, "transferBill") || null,
+                    } as Operation;
+                  })
                 }
               >
                 <div className="fields">
@@ -700,30 +787,56 @@ export default function Workspace() {
                     accounts={accounts}
                     name="fromId"
                     label="From account"
+                    value={pairFrom?.accountId}
                   />
                   <AccountSelect
                     accounts={accounts}
                     name="toId"
                     label="To account (card for payment)"
+                    value={pairTo?.accountId}
                   />
-                  <Input label="Transfer amount ($, positive)" name="amount" />
-                  <Input label="Transfer description" name="description" />
+                  <Input
+                    label="Transfer amount ($, positive)"
+                    name="amount"
+                    value={pairFrom ? dollars(-pairFrom.amount) : undefined}
+                  />
+                  <Input
+                    label="Transfer description"
+                    name="description"
+                    value={pairFrom?.description}
+                  />
                   <Input
                     label="Transfer date"
                     name="date"
                     type="date"
-                    value={today()}
+                    value={pairFrom?.date || today()}
                   />
                   <Field label="Transfer status">
-                    <select name="status">
+                    <select
+                      name="status"
+                      defaultValue={pairFrom?.status || "cleared"}
+                    >
                       <option value="cleared">Cleared</option>
                       <option value="pending">Pending</option>
                     </select>
                   </Field>
                 </div>
+                <OccurrenceFields
+                  state={state}
+                  prefix="transferBill"
+                  current={pairFrom?.occurrence}
+                  today={today()}
+                />
                 <div className="actions">
+                  {transferEdit && (
+                    <button type="button" onClick={() => setTransferEdit(null)}>
+                      Cancel pair edit
+                    </button>
+                  )}
                   <button disabled={busy || accounts.length < 2}>
-                    Prepare paired transfer
+                    {transferEdit
+                      ? "Prepare paired transfer changes"
+                      : "Prepare paired transfer"}
                   </button>
                 </div>
               </form>
@@ -781,7 +894,7 @@ export default function Workspace() {
                         "Account / description",
                         "Amount",
                         "Status",
-                        "Cleared balance through day",
+                        "Cleared running balance",
                         "Actions",
                       ].map((v) => (
                         <th key={v} scope="col">
@@ -829,7 +942,7 @@ export default function Workspace() {
                               {t.reconciledAt && " · reconciled"}
                             </td>
                             <td>
-                              {money(balance(a, transactions, t.date))}
+                              {money(running.get(t.id) ?? null)}
                               {liability(a) && " owed"}
                             </td>
                             <td>
@@ -884,6 +997,12 @@ export default function Workspace() {
         )}
         {tab === "Budget" && (
           <>
+            <BudgetCharts
+              state={state}
+              month={chartMonth}
+              today={today()}
+              onMonth={setBudgetMonth}
+            />
             <section className="card">
               <h2>Your categories</h2>
               <p>
@@ -988,6 +1107,7 @@ export default function Workspace() {
         )}
         {tab === "Forecaster" && (
           <>
+            <RecentBills state={state} today={today()} />
             <section className="card">
               <div className="row">
                 <h2>Estimated cash ahead</h2>
@@ -1005,6 +1125,10 @@ export default function Workspace() {
                 </Field>
               </div>
               <span className="pill">Preliminary / incomplete coverage</span>
+              <ForecastChart
+                days={projections.days}
+                opening={projections.opening}
+              />
               {projections.warnings.map((w) => (
                 <p key={w}>{w}</p>
               ))}
@@ -1045,72 +1169,13 @@ export default function Workspace() {
                 </table>
               </div>
             </section>
-            <section className="card">
-              <h2>Add recurring bill / income assumption</h2>
-              <p>
-                Negative for bills, positive for income. Does not create an
-                actual ledger entry. Recurring matching and schedule editing are
-                not implemented.
-              </p>
-              <form
-                onSubmit={(e) =>
-                  submit(e, (f) => ({
-                    kind: "recurrence",
-                    accountId: str(f, "accountId"),
-                    name: str(f, "name"),
-                    amount: parseMoney(str(f, "amount")),
-                    start: str(f, "start"),
-                    cadence: str(f, "cadence") as "weekly",
-                    clearingDays: Number(str(f, "clearingDays")),
-                  }))
-                }
-              >
-                <div className="fields">
-                  <AccountSelect accounts={accounts} name="accountId" />
-                  <Input label="Schedule name" name="name" />
-                  <Input label="Signed recurring amount ($)" name="amount" />
-                  <Input
-                    label="First due / expected date"
-                    name="start"
-                    type="date"
-                    value={today()}
-                  />
-                  <Field label="Cadence">
-                    <select name="cadence">
-                      <option value="weekly">Weekly</option>
-                      <option value="biweekly">Biweekly</option>
-                      <option value="monthly">
-                        Monthly (clamp to month end)
-                      </option>
-                    </select>
-                  </Field>
-                  <Input
-                    label="Estimated clearing delay (0–30 days)"
-                    name="clearingDays"
-                    type="number"
-                    value="0"
-                  />
-                </div>
-                <div className="actions">
-                  <button disabled={busy || !accounts.length}>
-                    Prepare recurring assumption
-                  </button>
-                </div>
-              </form>
-            </section>
-            <section className="card">
-              <h2>Approved assumptions</h2>
-              {state.recurrences.length ? (
-                state.recurrences.map((r) => (
-                  <p key={r.id}>
-                    {r.name} · {money(r.amount)} · {r.cadence} from {r.start} +{" "}
-                    {r.clearingDays} days · estimate only
-                  </p>
-                ))
-              ) : (
-                <p>No recurring bills or income configured.</p>
-              )}
-            </section>
+            <PlanningPanel
+              state={state}
+              today={today()}
+              busy={busy}
+              submit={submit}
+              prepare={(op) => void run(() => prepare(op))}
+            />
           </>
         )}
         {tab === "Inbox" && (
@@ -1198,6 +1263,22 @@ export default function Workspace() {
                 .map((p) => (
                   <p key={p.id}>
                     {p.operation.kind} · {p.status} · {p.id}
+                    {p.status === "approved" &&
+                      p.operation.kind === "deleteTransaction" && (
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            void run(() =>
+                              prepare({
+                                kind: "restoreTransaction",
+                                sourceProposalId: p.id,
+                              }),
+                            )
+                          }
+                        >
+                          Review undo deletion
+                        </button>
+                      )}
                     {p.status === "approved" && (
                       <button
                         onClick={() =>
@@ -1221,6 +1302,30 @@ export default function Workspace() {
         )}
         {tab === "Settings" && (
           <>
+            <ExportPanel
+              busy={busy}
+              download={(format, includeDrafts) =>
+                void run(async () => {
+                  const result = await api("export", "POST", {
+                    format,
+                    includeDrafts,
+                  });
+                  const url = URL.createObjectURL(
+                    new Blob([result.data], { type: result.type }),
+                  );
+                  const anchor = document.createElement("a");
+                  anchor.href = url;
+                  anchor.download = result.filename;
+                  document.body.appendChild(anchor);
+                  anchor.click();
+                  anchor.remove();
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  setNotice(
+                    "Private export downloaded. No financial records were changed.",
+                  );
+                })
+              }
+            />
             {authProvider === "supabase" && (
               <section className="card">
                 <h2>Account security</h2>
@@ -1277,6 +1382,7 @@ export default function Workspace() {
                   void run(async () => {
                     await api("state", "PATCH", {
                       setup: str(f, "setup"),
+                      timezone: str(f, "timezone"),
                       promotions: f.get("promotions") === "on",
                     });
                     await refresh();
@@ -1285,6 +1391,11 @@ export default function Workspace() {
                 }}
               >
                 <div className="fields">
+                  <Input
+                    label="Timezone (IANA name)"
+                    name="timezone"
+                    value={state.settings.timezone || "Etc/UTC"}
+                  />
                   <Field label="Setup status">
                     <select name="setup" defaultValue={state.settings.setup}>
                       <option value="needs-review">Needs review</option>
