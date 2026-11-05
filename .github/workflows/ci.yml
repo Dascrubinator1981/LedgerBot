@@ -26,8 +26,9 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      # Test the compiled build before next dev replaces the shared .next output.
       - run: npm run test:e2e:production
+      - run: npm run test:e2e
       - run: npm audit --omit=dev
       # Include development-tool advisories in the release gate.
       - run: npm audit

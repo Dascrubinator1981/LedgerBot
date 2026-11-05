@@ -4,6 +4,8 @@ Private local development milestone. **Fabricated data only; not production-read
 
 ## Current staged work
 
+New to development? Start with [Try LedgerBot yourself](docs/TRY_LEDGERBOT.md) for installation, a fictional walkthrough and help reading GitHub check emails.
+
 The latest usability slice adds Dashboard graph drill-down into a category/account-filtered Budget view. See [the experience follow-up](docs/EXPERIENCE_FOLLOWUP.md) for scope, tests and the accepted next slices.
 
 See [the staged report](docs/STAGED_IMPLEMENTATION_REPORT.md) for current functionality, exact validation and remaining launch gates. The four-stage prompt now has tested implementation checkpoints; it is not fully satisfied and the application remains **NO-GO for real-user beta or public launch**.
