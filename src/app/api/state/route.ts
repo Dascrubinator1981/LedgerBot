@@ -1,24 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { z } from "zod";
-import { database } from "@/lib/db";
 import { state } from "@/lib/finance";
-import { body, failure, mutation, session } from "@/lib/http";
+import { body } from "@/lib/http";
+import { withFinance } from "@/lib/backend";
+import { postgresMode } from "@/lib/provider-auth";
+import { PublicError } from "@/lib/errors";
 export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
-  try {
-    const s = session(request);
-    return NextResponse.json(
-      { ...state(database(), s.userId), csrf: s.csrf },
-      { headers: { "Cache-Control": "no-store" } },
-    );
-  } catch (error) {
-    return failure(error);
-  }
+  return withFinance(request, false, async (db, s) => ({
+    ...(await state(db, s.userId)),
+    csrf: s.csrf,
+    authProvider: postgresMode() ? "supabase" : "local-development",
+  }));
 }
 export async function PATCH(request: NextRequest) {
-  try {
-    const s = mutation(request);
-    if (s.principal !== "human") throw new Error("Human session required");
+  return withFinance(request, true, async (db, s) => {
+    if (s.principal !== "human")
+      throw new PublicError("Human session required");
     const settings = z
       .object({
         setup: z.enum([
@@ -30,11 +28,9 @@ export async function PATCH(request: NextRequest) {
         promotions: z.boolean(),
       })
       .parse(await body(request));
-    database()
+    await db
       .prepare("UPDATE users SET setup=?,promotions=? WHERE id=?")
       .run(settings.setup, settings.promotions ? 1 : 0, s.userId);
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    return failure(error);
-  }
+    return { ok: true };
+  });
 }

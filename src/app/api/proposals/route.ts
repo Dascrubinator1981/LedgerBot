@@ -1,25 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { z } from "zod";
-import { database } from "@/lib/db";
 import { propose, discard } from "@/lib/finance";
-import { body, failure, mutation } from "@/lib/http";
+import { body } from "@/lib/http";
+import { withFinance } from "@/lib/backend";
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
-  try {
-    return NextResponse.json(
-      propose(database(), mutation(request), await body(request)),
-    );
-  } catch (error) {
-    return failure(error);
-  }
+  return withFinance(request, true, async (db, s) =>
+    propose(db, s, await body(request)),
+  );
 }
 export async function DELETE(request: NextRequest) {
-  try {
-    const s = mutation(request);
+  return withFinance(request, true, async (db, s) => {
     const { id } = z.object({ id: z.uuid() }).parse(await body(request));
-    discard(database(), s, id);
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    return failure(error);
-  }
+    await discard(db, s, id);
+    return { ok: true };
+  });
 }

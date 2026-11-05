@@ -46,7 +46,7 @@ export default function Workspace() {
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("Dashboard"),
-    [mode, setMode] = useState<"login" | "signup">("signup"),
+    [mode, setMode] = useState<"login" | "signup" | "recover">("signup"),
     [notice, setNotice] = useState(""),
     [error, setError] = useState("");
   const [review, setReview] = useState<{
@@ -60,6 +60,7 @@ export default function Workspace() {
     [query, setQuery] = useState(""),
     [monthFilter, setMonthFilter] = useState("");
   const [horizon, setHorizon] = useState(30);
+  const [authProvider, setAuthProvider] = useState("local-development");
   const guard = useRef(false);
   async function api(path: string, method = "GET", payload?: unknown) {
     const response = await fetch(`/api/${path}`, {
@@ -71,7 +72,15 @@ export default function Workspace() {
       body: payload === undefined ? undefined : JSON.stringify(payload),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "Request failed");
+    if (!response.ok) {
+      if (response.status === 401 || result.signedOut) {
+        setState(null);
+        setCsrf("");
+        setReview(null);
+        setEdit(null);
+      }
+      throw new Error(result.error || result.message || "Request failed");
+    }
     return result;
   }
   async function refresh() {
@@ -80,12 +89,21 @@ export default function Workspace() {
     setCsrf(result.csrf);
   }
   useEffect(() => {
+    void fetch("/api/config")
+      .then((r) => r.json())
+      .then((result) => setAuthProvider(result.authProvider))
+      .catch(() => {});
     fetch("/api/state")
       .then(async (r) => {
         if (r.ok) {
           const result = await r.json();
           setState(result);
           setCsrf(result.csrf);
+          setAuthProvider(result.authProvider);
+          if (
+            new URLSearchParams(window.location.search).get("recovery") === "1"
+          )
+            setTab("Settings");
         } else if (r.status !== 401)
           setError("Could not load your records. Try reloading.");
       })
@@ -111,7 +129,13 @@ export default function Workspace() {
     const proposal = await api("proposals", "POST", operation);
     await refresh();
     const r = await api("review", "POST", { id: proposal.id });
-    setReview({ ...r, key: crypto.randomUUID() });
+    setReview({ ...r, key: approvalKey(proposal.id) });
+  }
+  function approvalKey(id: string) {
+    const name = `ledgerbot-approval:${id}`;
+    const key = sessionStorage.getItem(name) || crypto.randomUUID();
+    sessionStorage.setItem(name, key);
+    return key;
   }
   function submit(
     event: FormEvent<HTMLFormElement>,
@@ -143,7 +167,11 @@ export default function Workspace() {
         <p>Record reality. Build your plan. See what’s ahead.</p>
         <div className="card">
           <h2>
-            {mode === "signup" ? "Start an empty workspace" : "Welcome back"}
+            {mode === "signup"
+              ? "Start an empty workspace"
+              : mode === "recover"
+                ? "Recover your account"
+                : "Welcome back"}
           </h2>
           <p>
             No bank connection, AI key, or payment required. New accounts
@@ -154,12 +182,16 @@ export default function Workspace() {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
               void run(async () => {
-                await api("auth", "POST", {
+                const result = await api("auth", "POST", {
                   mode,
                   email: str(f, "email"),
                   password: str(f, "password"),
                 });
-                await refresh();
+                if (result.pending) setNotice(result.message);
+                else {
+                  await refresh();
+                  setTab("Dashboard");
+                }
               });
             }}
           >
@@ -172,20 +204,26 @@ export default function Workspace() {
                 maxLength={254}
               />
             </Field>
-            <Field label="Password (at least 12 characters)">
-              <input
-                name="password"
-                type="password"
-                autoComplete={
-                  mode === "signup" ? "new-password" : "current-password"
-                }
-                minLength={12}
-                maxLength={128}
-                required
-              />
-            </Field>
+            {mode !== "recover" && (
+              <Field label="Password (at least 12 characters)">
+                <input
+                  name="password"
+                  type="password"
+                  autoComplete={
+                    mode === "signup" ? "new-password" : "current-password"
+                  }
+                  minLength={12}
+                  maxLength={128}
+                  required
+                />
+              </Field>
+            )}
             <button className="primary" disabled={busy}>
-              {mode === "signup" ? "Create my empty account" : "Sign in"}
+              {mode === "signup"
+                ? "Create my empty account"
+                : mode === "recover"
+                  ? "Send recovery email"
+                  : "Sign in"}
             </button>
           </form>
           <div className="actions">
@@ -197,7 +235,19 @@ export default function Workspace() {
                 : "Create a new account"}
             </button>
           </div>
+          {authProvider === "supabase" && (
+            <div className="actions">
+              <button onClick={() => setMode("recover")}>
+                Forgot your password?
+              </button>
+            </div>
+          )}
         </div>
+        {notice && (
+          <p className="notice success" role="status">
+            {notice}
+          </p>
+        )}
         {error && (
           <p role="alert" className="notice error">
             {error}
@@ -205,8 +255,10 @@ export default function Workspace() {
         )}
         <p>
           <small>
-            Development milestone · Use fabricated values only. Email
-            verification, password recovery, MFA, and isolated demo mode are not
+            {authProvider === "supabase"
+              ? "Verified email and password recovery are enabled for this configured provider."
+              : "Local development authentication: email verification and recovery are unavailable in SQLite mode."}{" "}
+            Use fabricated values only. MFA and isolated demo are not
             implemented.
           </small>
         </p>
@@ -1094,7 +1146,7 @@ export default function Workspace() {
                               const r = await api("review", "POST", {
                                 id: p.id,
                               });
-                              setReview({ ...r, key: crypto.randomUUID() });
+                              setReview({ ...r, key: approvalKey(p.id) });
                             })
                           }
                         >
@@ -1146,6 +1198,22 @@ export default function Workspace() {
                 .map((p) => (
                   <p key={p.id}>
                     {p.operation.kind} · {p.status} · {p.id}
+                    {p.status === "approved" && (
+                      <button
+                        onClick={() =>
+                          void run(async () => {
+                            const receipt = await api(
+                              `receipts?proposalId=${p.id}`,
+                            );
+                            setNotice(
+                              `Saved receipt ${receipt.id}. Confirmed ${new Date(receipt.committedAt).toLocaleString()}.`,
+                            );
+                          })
+                        }
+                      >
+                        Check saved receipt
+                      </button>
+                    )}
                   </p>
                 ))}
             </section>
@@ -1153,6 +1221,49 @@ export default function Workspace() {
         )}
         {tab === "Settings" && (
           <>
+            {authProvider === "supabase" && (
+              <section className="card">
+                <h2>Account security</h2>
+                <p>
+                  A password change requires a fresh sign-in or recovery link
+                  from the last five minutes. It revokes all LedgerBot app
+                  sessions.
+                </p>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const f = new FormData(e.currentTarget);
+                    void run(async () => {
+                      const result = await api("auth", "POST", {
+                        mode: "password",
+                        password: str(f, "newPassword"),
+                      });
+                      setState(null);
+                      setCsrf("");
+                      setReview(null);
+                      setMode("login");
+                      setNotice(result.message);
+                    });
+                  }}
+                >
+                  <Field label="New password (at least 12 characters)">
+                    <input
+                      type="password"
+                      name="newPassword"
+                      minLength={12}
+                      maxLength={128}
+                      autoComplete="new-password"
+                      required
+                    />
+                  </Field>
+                  <div className="actions">
+                    <button disabled={busy}>
+                      Change password and revoke sessions
+                    </button>
+                  </div>
+                </form>
+              </section>
+            )}
             <section className="card">
               <h2>Setup & Personalization</h2>
               <p>

@@ -29,3 +29,19 @@ jobs:
       - run: npm audit --omit=dev
       # Include development-tool advisories in the release gate.
       - run: npm audit
+  postgres-and-verified-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run local:services
+      - run: npm run test:postgres
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:postgres

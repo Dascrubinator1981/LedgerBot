@@ -1,12 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { z } from "zod";
-import { database } from "@/lib/db";
 import { confirm } from "@/lib/finance";
-import { body, failure, mutation } from "@/lib/http";
+import { body } from "@/lib/http";
+import { withFinance } from "@/lib/backend";
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
-  try {
-    const s = mutation(request);
+  return withFinance(request, true, async (db, s) => {
     const input = z
       .object({
         proposalId: z.uuid(),
@@ -16,8 +15,6 @@ export async function POST(request: NextRequest) {
         idempotencyKey: z.string().min(16).max(100),
       })
       .parse(await body(request));
-    return NextResponse.json(confirm(database(), s, input));
-  } catch (error) {
-    return failure(error);
-  }
+    return confirm(db, s, input);
+  });
 }

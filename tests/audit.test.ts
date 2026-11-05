@@ -24,10 +24,10 @@ beforeEach(() => {
   );
 });
 afterEach(() => db.close());
-function post(op: Operation) {
-  const p = propose(db, user, op),
-    r = review(db, user, p.id);
-  return confirm(db, user, {
+async function post(op: Operation) {
+  const p = await propose(db, user, op),
+    r = await review(db, user, p.id);
+  return await confirm(db, user, {
     proposalId: p.id,
     digest: p.digest,
     version: p.version,
@@ -35,15 +35,15 @@ function post(op: Operation) {
     idempotencyKey: randomUUID(),
   });
 }
-function account() {
-  post({
+async function account() {
+  await post({
     kind: "account",
     name: "Fictional cash",
     type: "checking",
     opening: 10000,
     asOf: "2026-01-01",
   });
-  return state(db, user.userId).accounts[0];
+  return (await state(db, user.userId)).accounts[0];
 }
 describe("prelaunch audit regressions", () => {
   it("normalizes zero owed and empty budget actuals to positive zero", () => {
@@ -66,40 +66,41 @@ describe("prelaunch audit regressions", () => {
     expect(money(-29)).toBe("-$0.29");
     expect(() => money(Number.MAX_SAFE_INTEGER + 1)).toThrow();
   });
-  it("keeps budget identity stable when target is amended", () => {
-    post({ kind: "category", name: "Fictional food" });
-    const categoryId = state(db, user.userId).categories[0].id;
-    post({ kind: "budget", categoryId, month: "2026-01", target: 1000 });
-    const first = state(db, user.userId).budgets[0];
-    post({ kind: "budget", categoryId, month: "2026-01", target: 2000 });
-    const after = state(db, user.userId).budgets[0];
+  it("keeps budget identity stable when target is amended", async () => {
+    await post({ kind: "category", name: "Fictional food" });
+    const categoryId = (await state(db, user.userId)).categories[0].id;
+    await post({ kind: "budget", categoryId, month: "2026-01", target: 1000 });
+    const first = (await state(db, user.userId)).budgets[0];
+    await post({ kind: "budget", categoryId, month: "2026-01", target: 2000 });
+    const after = (await state(db, user.userId)).budgets[0];
     expect(after.id).toBe(first.id);
     expect(after.target).toBe(2000);
     expect(db.prepare("SELECT id FROM budgets").get()?.id).toBe(after.id);
   });
-  it("does not allow a later reconciliation to be overwritten with an older date", () => {
-    const a = account();
-    post({
+  it("does not allow a later reconciliation to be overwritten with an older date", async () => {
+    const a = await account();
+    await post({
       kind: "reconcile",
       accountId: a.id,
       date: "2026-01-05",
       statement: 10000,
     });
-    expect(() =>
-      propose(db, user, {
-        kind: "reconcile",
-        accountId: a.id,
-        date: "2026-01-03",
-        statement: 10000,
-      }),
-    ).toThrow(/later|reconcil/i);
+    await expect(
+      (async () =>
+        await propose(db, user, {
+          kind: "reconcile",
+          accountId: a.id,
+          date: "2026-01-03",
+          statement: 10000,
+        }))(),
+    ).rejects.toThrow(/later|reconcil/i);
   });
-  it("recomputes the digest of stored operations before commit", () => {
-    const p = propose(db, user, {
+  it("recomputes the digest of stored operations before commit", async () => {
+    const p = await propose(db, user, {
         kind: "category",
         name: "Reviewed category",
       }),
-      r = review(db, user, p.id);
+      r = await review(db, user, p.id);
     db.prepare("UPDATE proposals SET data=? WHERE id=?").run(
       JSON.stringify({
         ...p,
@@ -107,29 +108,34 @@ describe("prelaunch audit regressions", () => {
       }),
       p.id,
     );
-    expect(() =>
-      confirm(db, user, {
-        proposalId: p.id,
-        digest: p.digest,
-        version: p.version,
-        token: r.token,
-        idempotencyKey: randomUUID(),
-      }),
-    ).toThrow(/integrity|digest|match/i);
-    expect(state(db, user.userId).categories).toHaveLength(0);
+    await expect(
+      (async () =>
+        await confirm(db, user, {
+          proposalId: p.id,
+          digest: p.digest,
+          version: p.version,
+          token: r.token,
+          idempotencyKey: randomUUID(),
+        }))(),
+    ).rejects.toThrow(/integrity|digest|match/i);
+    expect((await state(db, user.userId)).categories).toHaveLength(0);
   });
-  it("rolls back discard if challenge invalidation fails", () => {
-    const p = propose(db, user, { kind: "category", name: "Discard me" });
-    review(db, user, p.id);
+  it("rolls back discard if challenge invalidation fails", async () => {
+    const p = await propose(db, user, { kind: "category", name: "Discard me" });
+    await review(db, user, p.id);
     db.exec(
       "CREATE TRIGGER fail_invalidation BEFORE UPDATE ON challenges BEGIN SELECT RAISE(ABORT,'synthetic failure'); END;",
     );
-    expect(() => discard(db, user, p.id)).toThrow();
-    expect(state(db, user.userId).proposals[0].status).toBe("awaiting_review");
+    await expect(
+      (async () => await discard(db, user, p.id))(),
+    ).rejects.toThrow();
+    expect((await state(db, user.userId)).proposals[0].status).toBe(
+      "awaiting_review",
+    );
   });
-  it("checks recurring-income coverage for cash accounts rather than liabilities", () => {
-    const a = account();
-    const s = state(db, user.userId);
+  it("checks recurring-income coverage for cash accounts rather than liabilities", async () => {
+    const a = await account();
+    const s = await state(db, user.userId);
     const liability = { ...a, id: randomUUID(), type: "credit" };
     const f = forecast(
       {
@@ -151,23 +157,25 @@ describe("prelaunch audit regressions", () => {
     );
     expect(f.warnings).toContain("No recurring income is configured.");
   });
-  it("rejects invalid or unbounded forecast horizons", () => {
-    const s = state(db, user.userId);
+  it("rejects invalid or unbounded forecast horizons", async () => {
+    const s = await state(db, user.userId);
     for (const horizon of [0, -1, 1.5, 367, Infinity])
       expect(() => forecast(s, "2026-01-01", horizon)).toThrow();
   });
-  it("does not issue a review challenge for a corrupted stored proposal", () => {
-    const p = propose(db, user, { kind: "category", name: "Original" });
+  it("does not issue a review challenge for a corrupted stored proposal", async () => {
+    const p = await propose(db, user, { kind: "category", name: "Original" });
     db.prepare("UPDATE proposals SET data=? WHERE id=?").run(
       JSON.stringify({ ...p, before: { unexpected: "changed" } }),
       p.id,
     );
-    expect(() => review(db, user, p.id)).toThrow(/integrity/i);
+    await expect((async () => await review(db, user, p.id))()).rejects.toThrow(
+      /integrity/i,
+    );
     expect(db.prepare("SELECT count(*) n FROM challenges").get()?.n).toBe(0);
   });
-  it("keeps monthly anchors and clearing delay when jumping past old history", () => {
-    const a = account(),
-      s = state(db, user.userId);
+  it("keeps monthly anchors and clearing delay when jumping past old history", async () => {
+    const a = await account(),
+      s = await state(db, user.userId);
     const f = forecast(
       {
         ...s,

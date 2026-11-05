@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
+  logging:{incomingRequests:{ignore:[/\/auth\/callback/]},serverFunctions:false,browserToTerminal:false},
   serverExternalPackages: ["node:sqlite"],
   async headers() {
     return [

@@ -1,15 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { z } from "zod";
-import { database } from "@/lib/db";
 import { review } from "@/lib/finance";
-import { body, failure, mutation } from "@/lib/http";
+import { body } from "@/lib/http";
+import { withFinance } from "@/lib/backend";
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
-  try {
-    const s = mutation(request);
+  return withFinance(request, true, async (db, s) => {
     const { id } = z.object({ id: z.uuid() }).parse(await body(request));
-    return NextResponse.json(review(database(), s, id));
-  } catch (error) {
-    return failure(error);
-  }
+    return review(db, s, id);
+  });
 }

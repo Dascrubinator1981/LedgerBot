@@ -37,10 +37,10 @@ beforeEach(() => {
   );
 });
 afterEach(() => db.close());
-function post(op: Operation, user = alice) {
-  const p = propose(db, user, op);
-  const r = review(db, user, p.id);
-  return confirm(db, user, {
+async function post(op: Operation, user = alice) {
+  const p = await propose(db, user, op);
+  const r = await review(db, user, p.id);
+  return await confirm(db, user, {
     proposalId: p.id,
     version: p.version,
     digest: p.digest,
@@ -48,18 +48,21 @@ function post(op: Operation, user = alice) {
     idempotencyKey: randomUUID(),
   });
 }
-function account(
+async function account(
   name = "Pocket",
   opening: number | null = 10000,
   type: "checking" | "credit" | "savings" = "checking",
   user = alice,
 ) {
-  post({ kind: "account", name, opening, type, asOf: "2026-01-01" }, user);
-  return state(db, user.userId).accounts.at(-1)!;
+  await post(
+    { kind: "account", name, opening, type, asOf: "2026-01-01" },
+    user,
+  );
+  return (await state(db, user.userId)).accounts.at(-1)!;
 }
-function category(name = "Food") {
-  post({ kind: "category", name });
-  return state(db, alice.userId).categories.at(-1)!;
+async function category(name = "Food") {
+  await post({ kind: "category", name });
+  return (await state(db, alice.userId)).categories.at(-1)!;
 }
 describe("exact money and dates", () => {
   it("parses minor units without float rounding", () => {
@@ -95,8 +98,8 @@ describe("exact money and dates", () => {
   });
 });
 describe("zero-start and canonical ledger", () => {
-  it("creates no financial records for new users", () => {
-    const s = state(db, alice.userId);
+  it("creates no financial records for new users", async () => {
+    const s = await state(db, alice.userId);
     for (const list of [
       s.accounts,
       s.transactions,
@@ -109,19 +112,19 @@ describe("zero-start and canonical ledger", () => {
     expect(netWorth([], [])).toBeNull();
     expect(money(null)).toBe("Not set up yet");
   });
-  it("distinguishes unknown from a deliberately configured zero", () => {
-    const a = account("unknown", null);
+  it("distinguishes unknown from a deliberately configured zero", async () => {
+    const a = await account("unknown", null);
     expect(balance(a, [])).toBeNull();
-    const z = account("zero", 0);
+    const z = await account("zero", 0);
     expect(balance(z, [])).toBe(0);
     expect(money(0)).toBe("$0.00");
-    expect(state(db, bob.userId).accounts).toEqual([]);
+    expect((await state(db, bob.userId)).accounts).toEqual([]);
   });
-  it("card charge changes owed once; card payment is a transfer and not new spending", () => {
-    const cash = account("Cash", 10000),
-      card = account("Card", 5000, "credit"),
-      c = category();
-    post({
+  it("card charge changes owed once; card payment is a transfer and not new spending", async () => {
+    const cash = await account("Cash", 10000),
+      card = await account("Card", 5000, "credit"),
+      c = await category();
+    await post({
       kind: "transaction",
       accountId: card.id,
       date: "2026-01-02",
@@ -130,10 +133,10 @@ describe("zero-start and canonical ledger", () => {
       status: "cleared",
       splits: [{ categoryId: c.id, amount: -2000 }],
     });
-    let s = state(db, alice.userId);
+    let s = await state(db, alice.userId);
     expect(balance(card, s.transactions)).toBe(7000);
     expect(netWorth(s.accounts, s.transactions)).toBe(3000);
-    post({
+    await post({
       kind: "transfer",
       fromId: cash.id,
       toId: card.id,
@@ -142,16 +145,16 @@ describe("zero-start and canonical ledger", () => {
       description: "Card payment",
       status: "cleared",
     });
-    s = state(db, alice.userId);
+    s = await state(db, alice.userId);
     expect(balance(cash, s.transactions)).toBe(7000);
     expect(balance(card, s.transactions)).toBe(4000);
     expect(netWorth(s.accounts, s.transactions)).toBe(3000);
     expect(budgetActual(c.id, "2026-01", s.transactions)).toBe(2000);
   });
-  it("deleting either transfer leg atomically removes both", () => {
-    const a = account(),
-      b = account("Savings", 0, "savings");
-    post({
+  it("deleting either transfer leg atomically removes both", async () => {
+    const a = await account(),
+      b = await account("Savings", 0, "savings");
+    await post({
       kind: "transfer",
       fromId: a.id,
       toId: b.id,
@@ -160,15 +163,15 @@ describe("zero-start and canonical ledger", () => {
       description: "Move",
       status: "cleared",
     });
-    const s = state(db, alice.userId);
+    const s = await state(db, alice.userId);
     expect(netWorth(s.accounts, s.transactions)).toBe(10000);
-    post({ kind: "deleteTransaction", id: s.transactions[0].id });
-    expect(state(db, alice.userId).transactions).toHaveLength(0);
+    await post({ kind: "deleteTransaction", id: s.transactions[0].id });
+    expect((await state(db, alice.userId)).transactions).toHaveLength(0);
     expect(db.prepare("SELECT count(*) n FROM transfers").get()?.n).toBe(0);
   });
-  it("pending entries do not change cleared balances", () => {
-    const a = account();
-    post({
+  it("pending entries do not change cleared balances", async () => {
+    const a = await account();
+    await post({
       kind: "transaction",
       accountId: a.id,
       date: "2026-01-02",
@@ -177,12 +180,12 @@ describe("zero-start and canonical ledger", () => {
       status: "pending",
       splits: [],
     });
-    const s = state(db, alice.userId);
+    const s = await state(db, alice.userId);
     expect(balance(a, s.transactions)).toBe(10000);
   });
-  it("edit/delete actuals recomputes derived values", () => {
-    const a = account();
-    post({
+  it("edit/delete actuals recomputes derived values", async () => {
+    const a = await account();
+    await post({
       kind: "transaction",
       accountId: a.id,
       date: "2026-01-02",
@@ -191,8 +194,8 @@ describe("zero-start and canonical ledger", () => {
       status: "cleared",
       splits: [],
     });
-    let t = state(db, alice.userId).transactions[0];
-    post({
+    let t = (await state(db, alice.userId)).transactions[0];
+    await post({
       kind: "editTransaction",
       id: t.id,
       accountId: a.id,
@@ -202,15 +205,19 @@ describe("zero-start and canonical ledger", () => {
       status: "cleared",
       splits: [],
     });
-    expect(balance(a, state(db, alice.userId).transactions)).toBe(12000);
-    t = state(db, alice.userId).transactions[0];
-    post({ kind: "deleteTransaction", id: t.id });
-    expect(balance(a, state(db, alice.userId).transactions)).toBe(10000);
+    expect(balance(a, (await state(db, alice.userId)).transactions)).toBe(
+      12000,
+    );
+    t = (await state(db, alice.userId)).transactions[0];
+    await post({ kind: "deleteTransaction", id: t.id });
+    expect(balance(a, (await state(db, alice.userId)).transactions)).toBe(
+      10000,
+    );
   });
-  it("categorization and budget changes never post another debit", () => {
-    const a = account(),
-      c = category();
-    post({
+  it("categorization and budget changes never post another debit", async () => {
+    const a = await account(),
+      c = await category();
+    await post({
       kind: "transaction",
       accountId: a.id,
       date: "2026-01-02",
@@ -219,8 +226,8 @@ describe("zero-start and canonical ledger", () => {
       status: "cleared",
       splits: [],
     });
-    const t = state(db, alice.userId).transactions[0];
-    post({
+    const t = (await state(db, alice.userId)).transactions[0];
+    await post({
       kind: "editTransaction",
       id: t.id,
       accountId: a.id,
@@ -230,48 +237,55 @@ describe("zero-start and canonical ledger", () => {
       status: "cleared",
       splits: [{ categoryId: c.id, amount: -12000 }],
     });
-    post({ kind: "budget", categoryId: c.id, month: "2026-01", target: 20000 });
-    const s = state(db, alice.userId);
+    await post({
+      kind: "budget",
+      categoryId: c.id,
+      month: "2026-01",
+      target: 20000,
+    });
+    const s = await state(db, alice.userId);
     expect(s.transactions).toHaveLength(1);
     expect(balance(a, s.transactions)).toBe(-2000);
     expect(budgetActual(c.id, "2026-01", s.transactions)).toBe(12000);
   });
   it.each([-11999, -12001])(
     "blocks splits that do not balance: %i",
-    (amount) => {
-      const a = account(),
-        c = category();
-      expect(() =>
-        propose(db, alice, {
-          kind: "transaction",
-          accountId: a.id,
-          date: "2026-01-02",
-          description: "Split",
-          amount: -12000,
-          status: "cleared",
-          splits: [{ categoryId: c.id, amount }],
-        }),
-      ).toThrow(/exact/);
+    async (amount) => {
+      const a = await account(),
+        c = await category();
+      await expect(
+        (async () =>
+          await propose(db, alice, {
+            kind: "transaction",
+            accountId: a.id,
+            date: "2026-01-02",
+            description: "Split",
+            amount: -12000,
+            status: "cleared",
+            splits: [{ categoryId: c.id, amount }],
+          }))(),
+      ).rejects.toThrow(/exact/);
     },
   );
-  it("snapshots are end-of-day and cannot count same-day transactions twice", () => {
-    const a = account();
-    expect(() =>
-      propose(db, alice, {
-        kind: "transaction",
-        accountId: a.id,
-        date: "2026-01-01",
-        description: "Already included",
-        amount: -100,
-        status: "cleared",
-        splits: [],
-      }),
-    ).toThrow(/snapshot/);
+  it("snapshots are end-of-day and cannot count same-day transactions twice", async () => {
+    const a = await account();
+    await expect(
+      (async () =>
+        await propose(db, alice, {
+          kind: "transaction",
+          accountId: a.id,
+          date: "2026-01-01",
+          description: "Already included",
+          amount: -100,
+          status: "cleared",
+          splits: [],
+        }))(),
+    ).rejects.toThrow(/snapshot/);
     expect(balance(a, [], "2025-12-31")).toBeNull();
   });
-  it("blocks reconciliation mismatch and locks reconciled transactions", () => {
-    const a = account();
-    post({
+  it("blocks reconciliation mismatch and locks reconciled transactions", async () => {
+    const a = await account();
+    await post({
       kind: "transaction",
       accountId: a.id,
       date: "2026-01-02",
@@ -280,86 +294,96 @@ describe("zero-start and canonical ledger", () => {
       status: "cleared",
       splits: [],
     });
-    expect(() =>
-      propose(db, alice, {
-        kind: "reconcile",
-        accountId: a.id,
-        date: "2026-01-02",
-        statement: 10000,
-      }),
-    ).toThrow(/differ/);
-    post({
+    await expect(
+      (async () =>
+        await propose(db, alice, {
+          kind: "reconcile",
+          accountId: a.id,
+          date: "2026-01-02",
+          statement: 10000,
+        }))(),
+    ).rejects.toThrow(/differ/);
+    await post({
       kind: "reconcile",
       accountId: a.id,
       date: "2026-01-02",
       statement: 7500,
     });
-    const t = state(db, alice.userId).transactions[0];
+    const t = (await state(db, alice.userId)).transactions[0];
     expect(t.reconciledAt).toBe("2026-01-02");
-    expect(() =>
-      propose(db, alice, { kind: "deleteTransaction", id: t.id }),
-    ).toThrow(/Reconciled/);
+    await expect(
+      (async () =>
+        await propose(db, alice, { kind: "deleteTransaction", id: t.id }))(),
+    ).rejects.toThrow(/Reconciled/);
   });
 });
 describe("tenant and approval boundary", () => {
-  it("unapproved draft, review, and discard never change financial records", () => {
-    const p = propose(db, alice, {
+  it("unapproved draft, review, and discard never change financial records", async () => {
+    const p = await propose(db, alice, {
       kind: "account",
       name: "Uncommitted",
       type: "cash",
       opening: 0,
       asOf: "2026-01-01",
     });
-    expect(state(db, alice.userId).accounts).toHaveLength(0);
-    review(db, alice, p.id);
-    expect(state(db, alice.userId).accounts).toHaveLength(0);
-    discard(db, alice, p.id);
-    expect(() => review(db, alice, p.id)).toThrow();
-    expect(state(db, alice.userId).accounts).toHaveLength(0);
+    expect((await state(db, alice.userId)).accounts).toHaveLength(0);
+    await review(db, alice, p.id);
+    expect((await state(db, alice.userId)).accounts).toHaveLength(0);
+    await discard(db, alice, p.id);
+    await expect(
+      (async () => await review(db, alice, p.id))(),
+    ).rejects.toThrow();
+    expect((await state(db, alice.userId)).accounts).toHaveLength(0);
   });
-  it("rejects forged foreign account, category, transaction and proposal references", () => {
-    const a = account(),
-      c = category();
-    expect(state(db, bob.userId).accounts).toEqual([]);
-    expect(() =>
-      propose(db, bob, {
-        kind: "transaction",
-        accountId: a.id,
-        date: "2026-01-02",
-        description: "Forged",
-        amount: -100,
-        status: "cleared",
-        splits: [],
-      }),
-    ).toThrow(/unavailable/);
-    const b = account("Bob", 10000, "checking", bob);
-    expect(() =>
-      propose(db, bob, {
-        kind: "transaction",
-        accountId: b.id,
-        date: "2026-01-02",
-        description: "Forged split",
-        amount: -100,
-        status: "cleared",
-        splits: [{ categoryId: c.id, amount: -100 }],
-      }),
-    ).toThrow(/unavailable/);
-    const p = propose(db, alice, { kind: "category", name: "Private" });
-    expect(() => review(db, bob, p.id)).toThrow(/unavailable/);
-    expect(() => discard(db, bob, p.id)).toThrow(/unavailable/);
+  it("rejects forged foreign account, category, transaction and proposal references", async () => {
+    const a = await account(),
+      c = await category();
+    expect((await state(db, bob.userId)).accounts).toEqual([]);
+    await expect(
+      (async () =>
+        await propose(db, bob, {
+          kind: "transaction",
+          accountId: a.id,
+          date: "2026-01-02",
+          description: "Forged",
+          amount: -100,
+          status: "cleared",
+          splits: [],
+        }))(),
+    ).rejects.toThrow(/unavailable/);
+    const b = await account("Bob", 10000, "checking", bob);
+    await expect(
+      (async () =>
+        await propose(db, bob, {
+          kind: "transaction",
+          accountId: b.id,
+          date: "2026-01-02",
+          description: "Forged split",
+          amount: -100,
+          status: "cleared",
+          splits: [{ categoryId: c.id, amount: -100 }],
+        }))(),
+    ).rejects.toThrow(/unavailable/);
+    const p = await propose(db, alice, { kind: "category", name: "Private" });
+    await expect((async () => await review(db, bob, p.id))()).rejects.toThrow(
+      /unavailable/,
+    );
+    await expect((async () => await discard(db, bob, p.id))()).rejects.toThrow(
+      /unavailable/,
+    );
   });
-  it("database composite foreign keys reject cross-tenant references", () => {
-    const a = account();
+  it("database composite foreign keys reject cross-tenant references", async () => {
+    const a = await account();
     expect(() =>
       db
         .prepare("INSERT INTO transactions VALUES(?,?,?,?,?)")
         .run(randomUUID(), bob.userId, a.id, null, "{}"),
     ).toThrow(/FOREIGN KEY/);
   });
-  it("same idempotency retry returns the receipt and never duplicates a transfer", () => {
-    const a = account(),
-      b = account("B", 0);
-    const p = propose(db, alice, {
+  it("same idempotency retry returns the receipt and never duplicates a transfer", async () => {
+    const a = await account(),
+      b = await account("B", 0);
+    const p = await propose(db, alice, {
       kind: "transfer",
       fromId: a.id,
       toId: b.id,
@@ -368,7 +392,7 @@ describe("tenant and approval boundary", () => {
       description: "Move",
       status: "cleared",
     });
-    const r = review(db, alice, p.id);
+    const r = await review(db, alice, p.id);
     const input = {
       proposalId: p.id,
       version: p.version,
@@ -376,15 +400,18 @@ describe("tenant and approval boundary", () => {
       token: r.token,
       idempotencyKey: randomUUID(),
     };
-    expect(confirm(db, alice, input)).toEqual(confirm(db, alice, input));
-    expect(state(db, alice.userId).transactions).toHaveLength(2);
-    expect(() =>
-      confirm(db, alice, { ...input, idempotencyKey: randomUUID() }),
-    ).toThrow(/already/);
+    expect(await confirm(db, alice, input)).toEqual(
+      await confirm(db, alice, input),
+    );
+    expect((await state(db, alice.userId)).transactions).toHaveLength(2);
+    await expect(
+      (async () =>
+        await confirm(db, alice, { ...input, idempotencyKey: randomUUID() }))(),
+    ).rejects.toThrow(/already/);
   });
-  it("rejects altered digest, missing challenge, foreign session and stale proposals", () => {
-    const p = propose(db, alice, { kind: "category", name: "First" });
-    const r = review(db, alice, p.id);
+  it("rejects altered digest, missing challenge, foreign session and stale proposals", async () => {
+    const p = await propose(db, alice, { kind: "category", name: "First" });
+    const r = await review(db, alice, p.id);
     const input = {
       proposalId: p.id,
       version: p.version,
@@ -392,63 +419,77 @@ describe("tenant and approval boundary", () => {
       token: r.token,
       idempotencyKey: randomUUID(),
     };
-    expect(() =>
-      confirm(db, alice, { ...input, digest: "0".repeat(64) }),
-    ).toThrow(/match/);
-    expect(() => confirm(db, bob, input)).toThrow(/unavailable/);
-    expect(() =>
-      confirm(db, alice, { ...input, token: "0".repeat(64) }),
-    ).toThrow(/match/);
-    post({ kind: "category", name: "Competing change" });
-    expect(() => confirm(db, alice, input)).toThrow(/stale/);
-    expect(state(db, alice.userId).categories).toHaveLength(1);
+    await expect(
+      (async () =>
+        await confirm(db, alice, { ...input, digest: "0".repeat(64) }))(),
+    ).rejects.toThrow(/match/);
+    await expect((async () => await confirm(db, bob, input))()).rejects.toThrow(
+      /unavailable/,
+    );
+    await expect(
+      (async () =>
+        await confirm(db, alice, { ...input, token: "0".repeat(64) }))(),
+    ).rejects.toThrow(/match/);
+    await post({ kind: "category", name: "Competing change" });
+    await expect(
+      (async () => await confirm(db, alice, input))(),
+    ).rejects.toThrow(/stale/);
+    expect((await state(db, alice.userId)).categories).toHaveLength(1);
   });
-  it("expired challenge cannot commit", () => {
-    const p = propose(db, alice, { kind: "category", name: "Expired" }),
-      r = review(db, alice, p.id);
+  it("expired challenge cannot commit", async () => {
+    const p = await propose(db, alice, { kind: "category", name: "Expired" }),
+      r = await review(db, alice, p.id);
     db.prepare("UPDATE challenges SET expires=0").run();
-    expect(() =>
-      confirm(db, alice, {
-        proposalId: p.id,
-        version: p.version,
-        digest: p.digest,
-        token: r.token,
-        idempotencyKey: randomUUID(),
-      }),
-    ).toThrow(/expired/);
-    expect(state(db, alice.userId).categories).toHaveLength(0);
+    await expect(
+      (async () =>
+        await confirm(db, alice, {
+          proposalId: p.id,
+          version: p.version,
+          digest: p.digest,
+          token: r.token,
+          idempotencyKey: randomUUID(),
+        }))(),
+    ).rejects.toThrow(/expired/);
+    expect((await state(db, alice.userId)).categories).toHaveLength(0);
   });
-  it("rejects AI principals independently of caller claims", () => {
+  it("rejects AI principals independently of caller claims", async () => {
     db.prepare("UPDATE sessions SET principal='ai' WHERE hash=?").run(
       alice.sessionHash,
     );
     const ai = { ...alice, principal: "ai" as const };
-    const p = propose(db, ai, { kind: "category", name: "AI draft" });
-    expect(() => review(db, ai, p.id)).toThrow(/human/);
-    expect(() => review(db, alice, p.id)).toThrow(/human/);
-    expect(() =>
-      confirm(db, ai, {
-        proposalId: p.id,
-        version: p.version,
-        digest: p.digest,
-        token: "0".repeat(64),
-        idempotencyKey: randomUUID(),
-      }),
-    ).toThrow(/human/);
-    expect(state(db, alice.userId).categories).toHaveLength(0);
+    const p = await propose(db, ai, { kind: "category", name: "AI draft" });
+    await expect((async () => await review(db, ai, p.id))()).rejects.toThrow(
+      /human/,
+    );
+    await expect((async () => await review(db, alice, p.id))()).rejects.toThrow(
+      /human/,
+    );
+    await expect(
+      (async () =>
+        await confirm(db, ai, {
+          proposalId: p.id,
+          version: p.version,
+          digest: p.digest,
+          token: "0".repeat(64),
+          idempotencyKey: randomUUID(),
+        }))(),
+    ).rejects.toThrow(/human/);
+    expect((await state(db, alice.userId)).categories).toHaveLength(0);
   });
-  it("rejects logged-out and expired sessions", () => {
-    const p = propose(db, alice, { kind: "category", name: "A" });
+  it("rejects logged-out and expired sessions", async () => {
+    const p = await propose(db, alice, { kind: "category", name: "A" });
     db.prepare("UPDATE sessions SET expires=0").run();
-    expect(() => review(db, alice, p.id)).toThrow(/session/);
+    await expect((async () => await review(db, alice, p.id))()).rejects.toThrow(
+      /session/,
+    );
   });
-  it("rollback preserves transfer atomicity even if database insert fails", () => {
-    const a = account(),
-      b = account("B", 0);
+  it("rollback preserves transfer atomicity even if database insert fails", async () => {
+    const a = await account(),
+      b = await account("B", 0);
     db.exec(
       `CREATE TRIGGER fail_second BEFORE INSERT ON transactions WHEN NEW.account_id='${b.id}' BEGIN SELECT RAISE(ABORT,'injected failure'); END;`,
     );
-    const p = propose(db, alice, {
+    const p = await propose(db, alice, {
         kind: "transfer",
         fromId: a.id,
         toId: b.id,
@@ -457,29 +498,30 @@ describe("tenant and approval boundary", () => {
         description: "Atomic",
         status: "cleared",
       }),
-      r = review(db, alice, p.id);
-    expect(() =>
-      confirm(db, alice, {
-        proposalId: p.id,
-        version: p.version,
-        digest: p.digest,
-        token: r.token,
-        idempotencyKey: randomUUID(),
-      }),
-    ).toThrow();
-    expect(state(db, alice.userId).transactions).toHaveLength(0);
+      r = await review(db, alice, p.id);
+    await expect(
+      (async () =>
+        await confirm(db, alice, {
+          proposalId: p.id,
+          version: p.version,
+          digest: p.digest,
+          token: r.token,
+          idempotencyKey: randomUUID(),
+        }))(),
+    ).rejects.toThrow();
+    expect((await state(db, alice.userId)).transactions).toHaveLength(0);
     expect(db.prepare("SELECT count(*) n FROM transfers").get()?.n).toBe(0);
   });
 });
 describe("forecast provenance", () => {
-  it("unknown forecast stays unknown, not zero", () => {
-    const f = forecast(state(db, alice.userId), "2026-01-01");
+  it("unknown forecast stays unknown, not zero", async () => {
+    const f = forecast(await state(db, alice.userId), "2026-01-01");
     expect(f.days.every((d) => d.amount === null)).toBe(true);
     expect(f.warnings.some((w) => w.includes("income"))).toBe(true);
   });
-  it("due date plus clearing estimate changes forecast, never actual cleared state", () => {
-    const a = account();
-    post({
+  it("due date plus clearing estimate changes forecast, never actual cleared state", async () => {
+    const a = await account();
+    await post({
       kind: "recurrence",
       accountId: a.id,
       name: "Imaginary bill",
@@ -488,7 +530,7 @@ describe("forecast provenance", () => {
       cadence: "monthly",
       clearingDays: 2,
     });
-    const s = state(db, alice.userId),
+    const s = await state(db, alice.userId),
       f = forecast(s, "2026-01-01");
     expect(f.days.find((d) => d.date === "2026-01-03")?.amount).toBe(10000);
     expect(f.days.find((d) => d.date === "2026-01-05")?.amount).toBe(8500);
@@ -496,12 +538,11 @@ describe("forecast provenance", () => {
     expect(f.events[0].state).toBe("estimated");
   });
 });
-
 describe("exact impact previews and reconciled-period integrity", () => {
-  it("previews card payment before/after without writes", () => {
-    const cash = account("Cash", 10000),
-      card = account("Card", 7000, "credit");
-    const s = state(db, alice.userId);
+  it("previews card payment before/after without writes", async () => {
+    const cash = await account("Cash", 10000),
+      card = await account("Card", 7000, "credit");
+    const s = await state(db, alice.userId);
     const impact = financialImpact(s, {
       kind: "transfer",
       fromId: cash.id,
@@ -516,26 +557,27 @@ describe("exact impact previews and reconciled-period integrity", () => {
       [7000, 4000],
     ]);
     expect(impact.netWorthAfter).toBe(impact.netWorthBefore);
-    expect(state(db, alice.userId).transactions).toHaveLength(0);
+    expect((await state(db, alice.userId)).transactions).toHaveLength(0);
   });
-  it("cannot backdate a new transaction into a reconciled period", () => {
-    const a = account();
-    post({
+  it("cannot backdate a new transaction into a reconciled period", async () => {
+    const a = await account();
+    await post({
       kind: "reconcile",
       accountId: a.id,
       date: "2026-01-05",
       statement: 10000,
     });
-    expect(() =>
-      propose(db, alice, {
-        kind: "transaction",
-        accountId: a.id,
-        date: "2026-01-02",
-        description: "Backdate",
-        amount: -100,
-        status: "cleared",
-        splits: [],
-      }),
-    ).toThrow(/reconciled period/);
+    await expect(
+      (async () =>
+        await propose(db, alice, {
+          kind: "transaction",
+          accountId: a.id,
+          date: "2026-01-02",
+          description: "Backdate",
+          amount: -100,
+          status: "cleared",
+          splits: [],
+        }))(),
+    ).rejects.toThrow(/reconciled period/);
   });
 });
