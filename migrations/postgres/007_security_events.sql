@@ -1,0 +1,11 @@
+BEGIN;
+CREATE TABLE IF NOT EXISTS ledgerbot.security_events(id uuid PRIMARY KEY,user_id uuid NOT NULL REFERENCES ledgerbot.users(id),event text NOT NULL CHECK(event IN ('session_revoked','other_sessions_revoked')),created bigint NOT NULL);
+ALTER TABLE ledgerbot.security_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ledgerbot.security_events FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS owner_only ON ledgerbot.security_events;
+CREATE POLICY owner_only ON ledgerbot.security_events USING(user_id=ledgerbot.viewer()) WITH CHECK(user_id=ledgerbot.viewer());
+GRANT SELECT,INSERT ON ledgerbot.security_events TO ledgerbot_server;
+REVOKE UPDATE,DELETE ON ledgerbot.security_events FROM ledgerbot_server;
+CREATE INDEX IF NOT EXISTS security_events_owner_time ON ledgerbot.security_events(user_id,created);
+INSERT INTO ledgerbot.schema_migrations(version) VALUES(7) ON CONFLICT DO NOTHING;
+COMMIT;
