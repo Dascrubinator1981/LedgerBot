@@ -1,3 +1,5 @@
+> Latest beta-hardening evidence: [BETA_READINESS_REPORT.md](BETA_READINESS_REPORT.md). The minimatch finding is now resolved with compatibility evidence; the historical results below describe the earlier checkpoint.
+
 > Current staged implementation: see [STAGED_IMPLEMENTATION_REPORT.md](STAGED_IMPLEMENTATION_REPORT.md), [Stage 1](STAGE_1_REPORT.md), [Stage 2](STAGE_2_REPORT.md), [Stage 3](STAGE_3_REPORT.md), and [operations](OPERATIONS.md). The original milestone/audit below is historical; later reports supersede its feature-status statements.
 
 # Initial manual foundation · readiness report

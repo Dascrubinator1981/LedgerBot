@@ -10,6 +10,7 @@ import {
 import { propose, review, confirm, state, discard } from "../src/lib/finance";
 import { hash, secret, type Session } from "../src/lib/auth";
 import { balance, budgetActual, type Operation } from "../src/lib/domain";
+import { listSessions, revokeSession } from "../src/lib/session-management";
 const enabled = !!process.env.LEDGERBOT_TEST_ADMIN_URL;
 describe.skipIf(!enabled)(
   "real PostgreSQL identity, policies and atomic finance",
@@ -79,6 +80,45 @@ describe.skipIf(!enabled)(
         expect(role.rows[0]).toEqual({ rolsuper: false, rolbypassrls: false });
         expect((await state(db, alice.userId)).accounts).toEqual([]);
       });
+    });
+    it("isolates session revocation and its append-only security events under real RLS", async () => {
+      const owner = await identity(),
+        token = secret(),
+        s: Session = { ...owner, sessionHash: hash(token) };
+      await scope(owner, async (db) => {
+        await db
+          .prepare(
+            "INSERT INTO sessions(hash,user_id,expires,csrf,principal) VALUES(?,?,?,?,?)",
+          )
+          .run(
+            s.sessionHash,
+            owner.userId,
+            Date.now() + 3600000,
+            s.csrf,
+            "human",
+          );
+      });
+      const sessions = await scope(owner, (db) => listSessions(db, owner));
+      const target = sessions.sessions.find((item) => !item.current)!;
+      await scope(owner, (db) => revokeSession(db, owner, { id: target.id }));
+      await expect(scope(s, (db) => listSessions(db, s))).rejects.toThrow(
+        /Sign in/,
+      );
+      expect(
+        (await scope(owner, (db) => listSessions(db, owner))).sessions,
+      ).toHaveLength(1);
+      expect(
+        (
+          await scope(bob, (db) =>
+            db.client.query("SELECT id FROM security_events WHERE user_id=$1", [
+              owner.userId,
+            ]),
+          )
+        ).rows,
+      ).toEqual([]);
+      await expect(
+        scope(owner, (db) => db.client.query("DELETE FROM security_events")),
+      ).rejects.toMatchObject({ code: "42501" });
     });
     it("preserves the old card/payment/category invariants on PostgreSQL", async () => {
       await post({

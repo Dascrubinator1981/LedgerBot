@@ -1,3 +1,4 @@
+import { sessionFlow } from "../e2e/helpers/session-flow";
 import { inlineCategoryFlow } from "../e2e/helpers/inline-category-flow";
 import { correlationFlow } from "../e2e/helpers/correlation-flow";
 import {
@@ -205,4 +206,15 @@ test("verified inline category review preserves unfinished financial entries", a
 }) => {
   await signup(page, `inline-${crypto.randomUUID()}@example.test`);
   await inlineCategoryFlow(page);
+});
+
+test("verified owner revokes another app sign-in and its pending approval", async ({
+  page,
+  browser,
+}) => {
+  const email = `sessions-${crypto.randomUUID()}@example.test`;
+  await signup(page, email);
+  const context = await browser.newContext();
+  await sessionFlow(page, await context.newPage(), email, password);
+  await context.close();
 });

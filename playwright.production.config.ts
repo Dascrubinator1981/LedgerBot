@@ -15,5 +15,9 @@ export default defineConfig({
     url: "http://127.0.0.1:3200",
     reuseExistingServer: false,
     timeout: 60000,
+    env: {
+      LEDGERBOT_BACKEND: "postgres",
+      LEDGERBOT_APP_ORIGIN: "http://127.0.0.1:3200",
+    },
   },
 });

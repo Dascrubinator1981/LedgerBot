@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build --webpack",
-    "start": "next start --hostname 127.0.0.1",
+    "start": "node scripts/start.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
@@ -18,7 +18,9 @@
     "dev:postgres": "node scripts/dev-postgres.mjs",
     "test:recovery": "node scripts/test-recovery.mjs",
     "test:e2e:production": "playwright test --config=playwright.production.config.ts",
-    "check:secrets": "node scripts/check-secrets.mjs"
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "drafts:rotate": "node scripts/rotate-drafts.mjs",
+    "test:container": "node scripts/test-container.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -45,5 +47,10 @@
   "type": "module",
   "engines": {
     "node": ">=24.0.0 <25"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.1"
+    }
   }
 }

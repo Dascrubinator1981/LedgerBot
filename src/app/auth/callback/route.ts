@@ -7,6 +7,7 @@ import {
 import { withTenantDatabase } from "@/lib/postgres";
 export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now();
   const origin = process.env.LEDGERBOT_APP_ORIGIN || "http://127.0.0.1:3000";
   try {
     const code = request.nextUrl.searchParams.get("code");
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     if (!data.user?.email_confirmed_at)
       return auth.finish(NextResponse.redirect(`${origin}/?auth=invalid-link`));
     const session = await withTenantDatabase(data.user.id, (db) =>
-      newProviderSession(db, data.user),
+      newProviderSession(db, data.user, startedAt),
     );
     const suffix =
       request.nextUrl.searchParams.get("flow") === "recovery"

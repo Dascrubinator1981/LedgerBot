@@ -7,6 +7,7 @@ import { postgresMode, provider, appCookie } from "@/lib/provider-auth";
 import { providerAction } from "@/lib/provider-actions";
 import { withFinance } from "@/lib/backend";
 import { PublicError } from "@/lib/errors";
+import { signupsDisabled } from "@/lib/registration";
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +24,11 @@ export async function POST(request: NextRequest) {
         password: z.string().optional(),
       })
       .parse(await body(request));
+    if (input.mode === "signup" && signupsDisabled())
+      throw new PublicError(
+        "This private beta uses approved test accounts. Sign in or use the designated recovery flow.",
+        403,
+      );
     if (postgresMode()) return await providerAction(request, input);
     if (input.mode === "recover" || input.mode === "password")
       throw new PublicError(

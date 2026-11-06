@@ -4,6 +4,10 @@ Private local development milestone. **Fabricated data only; not production-read
 
 ## Current staged work
 
+Start with the [current beta-readiness report](docs/BETA_READINESS_REPORT.md), [device test guide](docs/DEVICE_TESTING_GUIDE.md), and [first provider-account step](docs/BETA_ACCOUNTS_FOR_OWNER.md).
+
+The beta-hardening checkpoint adds active sign-in revocation, versioned encryption-key rotation, closed production registration and a rehearsed non-root container package. The [device testing guide](docs/DEVICE_TESTING_GUIDE.md) covers Windows, iPhone and optional Steam Deck tests; no private HTTPS beta is deployed yet.
+
 New to development? Start with [Try LedgerBot yourself](docs/TRY_LEDGERBOT.md) for installation, a fictional walkthrough and help reading GitHub check emails.
 
 The latest usability slice adds Dashboard graph drill-down into a category/account-filtered Budget view. See [the experience follow-up](docs/EXPERIENCE_FOLLOWUP.md) for scope, tests and the accepted next slices.
@@ -66,7 +70,7 @@ npm audit
 
 With installed Chromium: `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e`. Browser tests use port 3100 and a separate fabricated-only `data/e2e.sqlite`; never point tests at customer data. Tests use unique synthetic identities and do not delete existing databases. CI creates its own fresh database.
 
-The full dependency audit currently fails with 8 moderate development-tool findings in the lint dependency chain; the production-only audit reports zero. This is recorded as an unresolved release gate, and CI now checks both. Do not run `npm audit fix --force` or suppress the findings to manufacture a passing result; see the re-audit for compatibility evidence.
+Both full and production-only npm audits now report zero findings after a narrowly scoped, compatibility-tested minimatch security override. React, accessibility and TypeScript lint rules remain unchanged; see [the dependency resolution evidence](docs/DEPENDENCY_SECURITY.md). Do not use `npm audit fix --force` or suppress advisories. Hosted/device/legal release gates remain open.
 
 Build compiles but never publishes. Production mode sets Secure cookies and requires HTTPS; use `npm run dev` for local HTTP interaction. No hosting workflow is included.
 
@@ -76,4 +80,4 @@ The next staged implementation prompt is [CODEX_PRIVATE_BETA_PROMPT.md](docs/COD
 
 See [architecture](docs/ARCHITECTURE.md), [data model](docs/DATA_MODEL.md), [financial conventions](docs/FINANCIAL_ENGINE.md), [security](docs/SECURITY.md), [test plan](docs/TEST_PLAN.md), and [release status](docs/RELEASE_STATUS.md).
 
-The complete product and staged contract remain partially implemented. PostgreSQL RLS, verified email recovery, encrypted drafts, occurrence matching, naming, reviewed restore, exports, graphs, navigation and a local recovery drill are now present. Hosted configuration, independent security/device testing, retention/erasure, key rotation, bounded backend pagination and the remaining dependency gate are unfinished. No real financial information is committed; no vendor integration or publication has been enabled.
+The complete product and staged contract remain partially implemented. PostgreSQL RLS, verified email recovery, encrypted drafts, occurrence matching, naming, reviewed restore, exports, graphs, navigation and a local recovery drill are now present. Hosted configuration, independent security/device testing, retention/erasure, key rotation, bounded backend pagination and further release assurance are unfinished. No real financial information is committed; no vendor integration or publication has been enabled.

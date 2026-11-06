@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { postgresReady } from "@/lib/postgres";
 import { draftKey } from "@/lib/draft-crypto";
+import { assertProductionConfiguration } from "@/lib/deployment-config";
 export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
   const headers = { "Cache-Control": "no-store" };
@@ -8,6 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ status: "alive" }, { headers });
   let ready = false;
   try {
+    assertProductionConfiguration();
     const origin = new URL(process.env.LEDGERBOT_APP_ORIGIN || "");
     const production = process.env.NODE_ENV === "production";
     if (
@@ -26,6 +28,7 @@ export async function GET(request: NextRequest) {
       process.env.LEDGERBOT_SUPABASE_URL,
     );
     const response = await fetch(health, {
+      headers: { apikey: process.env.LEDGERBOT_SUPABASE_ANON_KEY },
       cache: "no-store",
       signal: AbortSignal.timeout(3000),
     });

@@ -181,6 +181,8 @@ const runtime = {
   LEDGERBOT_SUPABASE_URL: "http://127.0.0.1:55321",
   LEDGERBOT_SUPABASE_ANON_KEY: config.anonKey,
   LEDGERBOT_DRAFT_KEY: config.draftKey,
+  LEDGERBOT_DRAFT_KEYS: JSON.stringify({ initial: config.draftKey }),
+  LEDGERBOT_DRAFT_ACTIVE_KEY_ID: "initial",
 };
 await writeFile(directory + "/runtime.json", JSON.stringify(runtime), {
   mode: 0o600,

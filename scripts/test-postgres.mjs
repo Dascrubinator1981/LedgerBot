@@ -17,7 +17,13 @@ const child = spawn(
     executable,
     ...(e2e
       ? ["test", "--config=playwright.postgres.config.ts"]
-      : ["run", "tests/postgres.test.ts", "tests/draft-crypto.test.ts"]),
+      : [
+          "run",
+          "tests/postgres.test.ts",
+          "tests/draft-crypto.test.ts",
+          "tests/key-rotation.test.ts",
+          "tests/rotation-postgres.test.ts",
+        ]),
   ],
   {
     stdio: "inherit",

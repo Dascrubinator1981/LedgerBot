@@ -1,3 +1,5 @@
+> Latest beta-hardening evidence: [BETA_READINESS_REPORT.md](BETA_READINESS_REPORT.md). The minimatch finding is now resolved with compatibility evidence; the historical results below describe the earlier checkpoint.
+
 # LedgerBot staged implementation — review candidate
 
 **Not deployed. Fictional data only. NO-GO for a real-user private beta and for public launch.** These are tested implementation checkpoints, not a claim that the complete four-stage contract or master product specification is finished.

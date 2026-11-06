@@ -41,6 +41,7 @@ import {
 import { SetupReminders } from "./setup-reminders";
 import { BudgetExplorer } from "./budget-explorer";
 import { CategorySelect } from "./category-select";
+import { SessionPanel } from "./session-panel";
 import { ReconciliationInvestigator } from "./reconciliation-investigator";
 
 export default function Workspace() {
@@ -64,6 +65,8 @@ export default function Workspace() {
     [monthFilter, setMonthFilter] = useState("");
   const [horizon, setHorizon] = useState(30);
   const [authProvider, setAuthProvider] = useState("local-development");
+  const [allowSignup, setAllowSignup] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [budgetMonth, setBudgetMonth] = useState("");
   const [transferEdit, setTransferEdit] = useState<Transaction | null>(null);
   const currentDay = civilToday(state?.settings.timezone);
@@ -194,8 +197,15 @@ export default function Workspace() {
   useEffect(() => {
     void fetch("/api/config")
       .then((r) => r.json())
-      .then((result) => setAuthProvider(result.authProvider))
-      .catch(() => {});
+      .then((result) => {
+        setAuthProvider(result.authProvider);
+        setAllowSignup(result.allowSignup !== false);
+        if (result.allowSignup === false) setMode("login");
+        setAuthReady(true);
+      })
+      .catch(() =>
+        setError("Could not load sign-in options. Reload to try again."),
+      );
     fetch("/api/state")
       .then(async (r) => {
         if (r.ok) {
@@ -333,7 +343,7 @@ export default function Workspace() {
                 />
               </Field>
             )}
-            <button className="primary" disabled={busy}>
+            <button className="primary" disabled={busy || !authReady}>
               {mode === "signup"
                 ? "Create my empty account"
                 : mode === "recover"
@@ -342,13 +352,24 @@ export default function Workspace() {
             </button>
           </form>
           <div className="actions">
-            <button
-              onClick={() => setMode(mode === "signup" ? "login" : "signup")}
-            >
-              {mode === "signup"
-                ? "Already registered? Sign in"
-                : "Create a new account"}
-            </button>
+            {!allowSignup && mode === "recover" && (
+              <button onClick={() => setMode("login")}>Back to sign in</button>
+            )}
+            {allowSignup && (
+              <button
+                onClick={() => setMode(mode === "signup" ? "login" : "signup")}
+              >
+                {mode === "signup"
+                  ? "Already registered? Sign in"
+                  : "Create a new account"}
+              </button>
+            )}
+            {!allowSignup && authReady && (
+              <p>
+                Private beta: use your approved test account. Public
+                registration is closed.
+              </p>
+            )}
           </div>
           {authProvider === "supabase" && (
             <div className="actions">
@@ -1416,6 +1437,11 @@ export default function Workspace() {
         )}
         {tab === "Settings" && (
           <>
+            <SessionPanel
+              busy={busy}
+              load={() => api("sessions")}
+              revoke={(input) => api("sessions", "DELETE", input)}
+            />
             <ExportPanel
               busy={busy}
               download={(format, includeDrafts) =>

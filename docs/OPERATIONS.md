@@ -17,7 +17,7 @@ For a future hosted installation, apply the sorted `migrations/postgres/*.sql` u
 
 Provide server-only `LEDGERBOT_BACKEND=postgres`, `LEDGERBOT_POSTGRES_URL`, `LEDGERBOT_SUPABASE_URL`, `LEDGERBOT_SUPABASE_ANON_KEY`, `LEDGERBOT_DRAFT_KEY` and exact `LEDGERBOT_APP_ORIGIN`. An anon provider key is not a privileged service key; it still stays in server configuration here. Configure provider email confirmation, exact callback allowlists, HTTPS mail links, SMTP deliverability and abuse protections. Never use development mail capture for customers.
 
-Terminate HTTPS at a trusted proxy, preserve canonical host/origin, strip untrusted forwarding headers, and set request-size/time limits. Production cookies are Secure and HttpOnly regardless of a false development override; readiness also refuses an insecure production origin or explicit insecure-cookie setting. Do not cache HTML, authentication or financial APIs. Do not record request bodies, query strings, cookies, exported files or provider responses in proxy/APM logs. Configure HSTS at the HTTPS edge only after validating its domain policy. No client analytics or external error-reporting vendor is active.
+Terminate HTTPS at a trusted proxy, preserve canonical host/origin, strip untrusted forwarding headers, and set request-size/time limits. Production cookies are Secure and HttpOnly regardless of a false development override; readiness also refuses an insecure production origin or explicit insecure-cookie setting. Do not cache HTML, authentication or financial APIs. Do not record request bodies, query strings, cookies, exported files or provider responses in proxy/APM logs. Configure HSTS at the HTTPS edge only after validating its domain policy. No client analytics or external error-reporting vendor is active. Production configuration now rejects non-HTTPS app/provider origins, insecure cookie settings, absent database/provider credentials and missing versioned encryption.
 
 ## Health and failures
 
@@ -31,7 +31,7 @@ Database connection and query timeouts are bounded. Writes use serializable tran
 
 **Hosted backups are not configured or tested.** Before beta, select provider point-in-time recovery and encrypted off-site export arrangements, then test a restore into an isolated project with separate authorization. Cover application tables, provider identity, roles/policies, migrations, encryption-key recovery and any future uploaded objects. The local drill covers application database restoration and existing group roles, not provider identity continuity, cross-region disaster recovery or a production-scale streaming backup.
 
-Store production encryption/backup keys in an external secret manager with restricted access, version history and separate recovery authority. Draft envelopes currently have one application key: automated multi-key rotation is not implemented. Before rotating, add an explicit key ID/read-old-write-new mechanism, dry-run decryptability checks, transactional re-encryption, verified backup and rollback support. Never replace the sole key and discard the old one. Agree recovery-point/recovery-time objectives and run a documented timed rehearsal before making promises.
+Store production encryption/backup keys in an external secret manager with restricted access, version history and separate recovery authority. Versioned key-ring reads/writes and a transactional operator rotation tool are now implemented and tested on disposable synthetic PostgreSQL databases. See [KEY_ROTATION.md](KEY_ROTATION.md) for dry-run, maintenance-window, backup/key retention and rollback requirements. Hosted escrow, representative maintenance-duration measurements and a hosted recovery rehearsal are still not configured or verified. Never discard old keys while a retained backup still needs them.
 
 ## Migration, rollback and incident response
 
@@ -42,3 +42,11 @@ On suspected unauthorized access: restrict the affected service, stop commits if
 ## Costs and external prerequisites
 
 Hosting, managed PostgreSQL/Auth, transactional email, backup retention, monitoring and domain registration remain unselected. Costs depend on region, usage, retention, email volume and provider tier; no current price has been verified in this environment and no paid account has been activated. Obtain dated quotes from chosen providers before committing a budget. AI, banks, OCR, voice and billing remain disabled and are outside this manual-finance candidate.
+
+## Closed beta registration and session controls
+
+Production candidates disable the application's public signup UI and reject direct signup requests. Configure Supabase Auth itself to disable public signup as well; its public Auth endpoints are outside the application route guard. Use a separate beta project with only approved pre-created test identities. For activation, use the app's tested Forgot Password/PKCE recovery flow with a designated mailbox and fresh password change; do not assume provider invite links with a different token format are supported by this callback.
+
+Settings lists active app sign-ins using public domain-separated handles, not stored session verifiers or tokens. A fresh five-minute human sign-in is required to revoke another session. Revocation expires its app access and invalidates its approval challenges atomically, recording an append-only owner-scoped security event. It is not global provider logout or a password reset. Change a compromised password too. Expired metadata/closure retention still needs owner/legal policy and an approved cleanup lifecycle before real customer use.
+
+The Docker candidate binds only to loopback during local rehearsal, runs as an unprivileged user with a read-only filesystem and dropped capabilities, and excludes local data/credential files. See deploy/README.md for the proposed hosting boundary. This local package is not a hosted beta or approval to deploy one.

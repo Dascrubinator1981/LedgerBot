@@ -1,11 +1,11 @@
+import { sessionFlow } from "./helpers/session-flow";
 import { inlineCategoryFlow } from "./helpers/inline-category-flow";
 import { correlationFlow } from "./helpers/correlation-flow";
 import { test, expect, type Page } from "@playwright/test";
 async function signup(page: Page) {
+  const email = `synthetic-${crypto.randomUUID()}@example.test`;
   await page.goto("/");
-  await page
-    .getByLabel("Email", { exact: true })
-    .fill(`synthetic-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel("Email", { exact: true }).fill(email);
   await page
     .getByLabel("Password (at least 12 characters)")
     .fill("fabricated-password-123");
@@ -13,6 +13,7 @@ async function signup(page: Page) {
   await expect(
     page.getByRole("heading", { name: "Your financial workspace" }),
   ).toBeVisible();
+  return email;
 }
 async function approve(page: Page) {
   const dialog = page.getByRole("dialog");
@@ -404,4 +405,19 @@ test("inline category review preserves ledger and budget work", async ({
 }) => {
   await signup(page);
   await inlineCategoryFlow(page);
+});
+
+test("owner can revoke another sign-in without permitting its prepared approval", async ({
+  page,
+  browser,
+}) => {
+  const email = await signup(page);
+  const context = await browser.newContext();
+  await sessionFlow(
+    page,
+    await context.newPage(),
+    email,
+    "fabricated-password-123",
+  );
+  await context.close();
 });

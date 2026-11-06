@@ -104,6 +104,9 @@ export function migrate(db: DatabaseSync) {
     CREATE TRIGGER IF NOT EXISTS occurrence_owner_update BEFORE UPDATE OF data ON transactions WHEN json_extract(NEW.data,'$.occurrence.recurrenceId') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM recurrences WHERE id=json_extract(NEW.data,'$.occurrence.recurrenceId') AND user_id=NEW.user_id) BEGIN SELECT RAISE(ABORT,'Foreign schedule reference'); END;
     INSERT OR IGNORE INTO schema_migrations(version) VALUES(3);
     INSERT OR IGNORE INTO schema_migrations(version) VALUES(4);
+    CREATE TABLE IF NOT EXISTS security_events(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),event TEXT NOT NULL CHECK(event IN ('session_revoked','other_sessions_revoked')),created INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS security_events_owner_time ON security_events(user_id,created);
+    INSERT OR IGNORE INTO schema_migrations(version) VALUES(5);
   `);
 }
 let singleton: DatabaseSync | undefined;

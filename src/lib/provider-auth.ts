@@ -3,9 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { hash, secret, type Session } from "./auth";
 import type { FinanceDb } from "./finance-db";
 import { PublicError } from "./errors";
+import { assertProductionConfiguration } from "./deployment-config";
 export const postgresMode = () => process.env.LEDGERBOT_BACKEND === "postgres";
 export const appCookie = "ledgerbot_session";
 export function provider(request: NextRequest) {
+  assertProductionConfiguration();
   const url = process.env.LEDGERBOT_SUPABASE_URL,
     key = process.env.LEDGERBOT_SUPABASE_ANON_KEY;
   if (!url || !key)
