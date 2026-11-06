@@ -1,3 +1,4 @@
+import { manualEntryFlow } from "./helpers/manual-entry-flow";
 import AxeBuilder from "@axe-core/playwright";
 import { savedPageFlow } from "./helpers/saved-page-flow";
 import { openReview } from "./helpers/open-review";
@@ -646,4 +647,11 @@ test("Ledger opens as a register with compact editors, selected-row editing and 
     .getByRole("button", { name: "+ Add transaction", exact: true })
     .click();
   await expect(page.getByLabel("Description", { exact: true })).toBeVisible();
+});
+
+test("manual same-day and historical entry choices keep pending, budget and cleared balances consistent", async ({
+  page,
+}) => {
+  await signup(page);
+  await manualEntryFlow(page, approve);
 });

@@ -1,4 +1,4 @@
-import { afterOpening } from "./domain";
+import { affectsBalance } from "./domain";
 import { balance, sumMoney, type FinanceState } from "./domain";
 export function investigateReconciliation(
   state: FinanceState,
@@ -13,7 +13,7 @@ export function investigateReconciliation(
   const entries = state.transactions.filter(
     (t) =>
       t.accountId === accountId &&
-      afterOpening(account, t.date) &&
+      affectsBalance(account, t) &&
       t.date <= through,
   );
   const difference = actual === null ? null : sumMoney([statement, -actual]);

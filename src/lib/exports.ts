@@ -1,4 +1,4 @@
-import { money, type FinanceState } from "./domain";
+import { affectsBalance, money, type FinanceState } from "./domain";
 export function financialExport(state: FinanceState, includeDrafts = false) {
   return {
     formatVersion: 2,
@@ -35,6 +35,8 @@ export function ledgerCsv(state: FinanceState) {
     "bill_or_income_schedule",
     "occurrence_due",
     "category_allocations",
+    "starting_balance_treatment",
+    "affects_current_balance_when_cleared",
   ];
   const rows = state.transactions.map((t) =>
     [
@@ -60,6 +62,12 @@ export function ledgerCsv(state: FinanceState) {
             amountMinor: s.amount,
           })),
         ),
+      ),
+      safeCsvText(t.balanceImpact || "legacy-date-rule"),
+      safeCsvText(
+        state.accounts.some((a) => a.id === t.accountId && affectsBalance(a, t))
+          ? "yes"
+          : "no",
       ),
     ].join(","),
   );

@@ -151,13 +151,13 @@ async function validate(db: FinanceDb, userId: string, op: SingleOperation) {
   if (op.kind === "transaction" || op.kind === "editTransaction") {
     const a = await account(op.accountId);
     await unlockedDate(a.id, op.date);
-    if (!afterOpening(a, op.date))
+    if (!afterOpening(a, op.date) && !op.balanceImpact)
       throw new PublicError(
-        "Transaction is included in the opening snapshot. Choose a later date, or review a correction to a starting balance before today’s entries in Accounts.",
+        "Choose whether this entry should change the balance or is already included in your starting balance.",
       );
-    if (op.date > civilToday(s.settings.timezone))
+    if (op.date > civilToday(s.settings.timezone) && op.status !== "pending")
       throw new PublicError(
-        `This date is ahead of today (${civilToday(s.settings.timezone)} in ${s.settings.timezone}). Choose today or an earlier date. Pending means a payment already made that has not cleared; it does not allow future dates. For a future bill, use a bill schedule.`,
+        `Cleared status does not allow future dates. Choose Pending / planned, or use today (${civilToday(s.settings.timezone)} in ${s.settings.timezone}) or an earlier date for a completed payment.`,
       );
     if (
       op.splits.length &&
@@ -203,10 +203,15 @@ async function validate(db: FinanceDb, userId: string, op: SingleOperation) {
       to = await account(op.toId);
     await unlockedDate(from.id, op.date);
     await unlockedDate(to.id, op.date);
-    if (!afterOpening(from, op.date) || !afterOpening(to, op.date))
-      throw new PublicError("Transfer must be after both opening snapshots");
-    if (op.date > civilToday(s.settings.timezone))
-      throw new PublicError("Future transfers are not actuals");
+    if (
+      (!afterOpening(from, op.date) && !op.fromBalanceImpact) ||
+      (!afterOpening(to, op.date) && !op.toBalanceImpact)
+    )
+      throw new PublicError(
+        "Choose how this transfer affects each account’s starting balance",
+      );
+    if (op.date > civilToday(s.settings.timezone) && op.status !== "pending")
+      throw new PublicError("Future transfers must stay Pending / planned");
   }
   if (op.kind === "budget") {
     if (op.newCategory) {
@@ -509,6 +514,10 @@ async function apply(db: FinanceDb, userId: string, op: SingleOperation) {
           transferId: id,
           reconciledAt: null,
           splits: [],
+          balanceImpact:
+            accountId === op.fromId ? op.fromBalanceImpact : op.toBalanceImpact,
+          balanceAnchor:
+            accountId === op.fromId ? op.fromBalanceAnchor : op.toBalanceAnchor,
           ...(amount < 0 && op.occurrence ? { occurrence: op.occurrence } : {}),
         });
       break;

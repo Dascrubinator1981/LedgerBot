@@ -25,10 +25,10 @@ See [the staged report](TODAY_UPDATE_REPORT.md) for current behavior. Financial 
 
 - A failed Prepare action should explain why beside the form and keep your input. Missing required fields should identify themselves.
 - With **Entry type → Expense / card purchase**, a positive `185` total and positive `80`, `50`, `55` splits should prepare as an expense of `-185` with three negative allocations. Automatic direction still requires signed values.
-- Transaction date must be today or earlier. A start-of-day opening includes entries on that date; a legacy end-of-day opening includes only later entries. Use the reviewed opening correction to change timing or opening date.
-- With a fictional opening of $1,000 dated yesterday, the cleared split purchase should leave $815. A $100 Groceries target should show $80 actuals and $20 remaining. Household/Automotive spending remains included in overall spending even without category targets.
+- New manual entries apply when cleared, including on the starting day. Tick **Already included in my starting balance** only for history that balance already covers. Future dates can stay **Pending / planned**; future entries cannot be **Cleared**. Older records retain their original treatment.
+- With a fictional opening of $1,000 dated today, the cleared split purchase should leave $815. A $100 Groceries target should show $80 actuals and $20 remaining. Household/Automotive spending remains included in overall spending even without category targets.
 - A statement of $1,000 should fail reconciliation after that purchase; the message should show $815 calculated. A statement of $815 through today should prepare for independent review. Do not confirm reconciliation until you are done correcting entries in that period: confirmation locks it.
-- On Budget choose **+ Add a new category**, enter its name and target, then prepare once. Both should appear together in review and neither should exist until confirmed. Canceling review should preserve the entry fields.
+- On Budget choose **+ Add a new category**, enter its name and target, then prepare once. Both should appear together in review and neither should exist until confirmed. Closing review keeps the staged change; use its Edit button to restore the entry fields.
 - Dashboard now includes the automatic Forecaster. Settings → Forecaster display selects horizon, accounts and displayed details. Its table includes today plus the chosen number of following days. Settings → Manage forecast bills and income plans holds recurring schedule controls. These are plans, not extra posted expenses.
 - Charts should be shorter. There should be no separate Forecaster item in the main sidebar; old direct URLs remain compatible for now.
 
@@ -36,8 +36,12 @@ Weekly/biweekly/quarterly targets, page-wide batch review and saved-review expir
 
 ## If a button still seems unresponsive
 
-After updating, use **Help troubleshoot → Start fresh recording**, close the dialog and try the action. Reopen it and choose **Download safe report** before refreshing. See [the step-by-step guide](TROUBLESHOOTING.md). Preparation now moves to the review queue with an explicit notice; your balances change only after confirmation. Tomorrow is a scheduled item, not a pending actual payment.
+After updating, use **Help troubleshoot → Start fresh recording**, close the dialog and try the action. Reopen it and choose **Download safe report** before refreshing. See [the step-by-step guide](TROUBLESHOOTING.md). Preparation now moves to the review queue with an explicit notice; your balances change only after confirmation. Future-dated entries now stay Pending / planned; cleared entries must use today or earlier.
 
 ## Register-first Ledger
 
 After this update, Ledger shows account balances and Transactions first. Use Add entry, select a row and Edit selected, or choose Transfer / card payment. Entry forms are folded away until needed. Full walkthrough: [LEDGER_REGISTER_REPORT.md](LEDGER_REGISTER_REPORT.md).
+
+## Easier manual entry
+
+New manual entries apply to the balance when cleared, including on the starting day. Use Already included in my starting balance for history that your balance already covers. Pending / planned amounts appear on the dotted budget line. See [MANUAL_ENTRY_UPDATE_REPORT.md](MANUAL_ENTRY_UPDATE_REPORT.md). No database reset is needed.

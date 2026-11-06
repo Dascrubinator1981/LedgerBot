@@ -145,6 +145,9 @@ export function SplitFields({
 }
 function Diff({ value, state }: { value: unknown; state: FinanceState }) {
   const labels: Record<string, string> = {
+    balanceImpact: "Starting-balance treatment",
+    fromBalanceImpact: "From account balance treatment",
+    toBalanceImpact: "To account balance treatment",
     kind: "Change",
     name: "Name",
     type: "Account type",
@@ -186,6 +189,10 @@ function Diff({ value, state }: { value: unknown; state: FinanceState }) {
     source: "Prepared by",
   };
   function show(key: string, v: unknown): ReactNode {
+    if (["balanceImpact", "fromBalanceImpact", "toBalanceImpact"].includes(key))
+      return v === "included"
+        ? "Already included in the starting balance; keep history without applying again"
+        : "Apply this entry to the balance (when cleared)";
     if (v === null)
       return key === "occurrence"
         ? "Not linked — ordinary transaction"
@@ -231,12 +238,22 @@ function Diff({ value, state }: { value: unknown; state: FinanceState }) {
     );
   return (
     <dl>
-      {Object.entries(value as Record<string, unknown>).map(([key, v]) => (
-        <div key={key}>
-          <dt>{labels[key] || key}</dt>
-          <dd>{show(key, v)}</dd>
-        </div>
-      ))}
+      {Object.entries(value as Record<string, unknown>)
+        .filter(
+          ([key]) =>
+            ![
+              "balanceAnchor",
+              "fromBalanceAnchor",
+              "toBalanceAnchor",
+              "openingVersion",
+            ].includes(key),
+        )
+        .map(([key, v]) => (
+          <div key={key}>
+            <dt>{labels[key] || key}</dt>
+            <dd>{show(key, v)}</dd>
+          </div>
+        ))}
     </dl>
   );
 }

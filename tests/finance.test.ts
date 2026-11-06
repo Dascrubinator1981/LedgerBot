@@ -267,7 +267,7 @@ describe("zero-start and canonical ledger", () => {
       ).rejects.toThrow(/exact/);
     },
   );
-  it("snapshots are end-of-day and cannot count same-day transactions twice", async () => {
+  it("legacy snapshots require an explicit inclusion choice for same-day entries", async () => {
     const a = await account();
     await expect(
       (async () =>
@@ -280,7 +280,7 @@ describe("zero-start and canonical ledger", () => {
           status: "cleared",
           splits: [],
         }))(),
-    ).rejects.toThrow(/snapshot/);
+    ).rejects.toThrow(/starting balance/);
     expect(balance(a, [], "2025-12-31")).toBeNull();
   });
   it("blocks reconciliation mismatch and locks reconciled transactions", async () => {

@@ -22,7 +22,9 @@ export function BudgetCharts({
   const id = useId(),
     data = budgetProgress(state, month, today);
   const numbers = data.series.flatMap((d) =>
-      d.actual === null ? [d.planned] : [d.planned, d.actual],
+      d.actual === null
+        ? [d.planned, d.withPending]
+        : [d.planned, d.actual, d.withPending],
     ),
     minimum = Math.min(0, ...numbers),
     maximum = Math.max(1, ...numbers),
@@ -36,6 +38,9 @@ export function BudgetCharts({
       .filter((d) => d.actual !== null)
       .map((d, i) => `${x(i)},${y(d.actual!)}`)
       .join(" ");
+  const pendingLine = data.series
+    .map((d, i) => `${x(i)},${y(d.withPending)}`)
+    .join(" ");
   return (
     <section className="card">
       <div className="row">
@@ -119,6 +124,7 @@ export function BudgetCharts({
               ({money(data.uncategorized)}) and spending in categories without
               targets ({money(data.unbudgeted)}) are included in this chart’s
               total. Pending spending ({money(data.pending)}) is separate.
+              Remaining after pending: {money(data.remainingAfterPending)}.
             </small>
           </p>
           {data.unclassifiedPositive !== 0 && (
@@ -185,6 +191,16 @@ export function BudgetCharts({
                     stroke="#66e5ca"
                     strokeWidth="3"
                   />
+                  <polyline
+                    data-testid="budget-pending-line"
+                    aria-label="Cleared plus pending or planned spending"
+                    points={pendingLine}
+                    fill="none"
+                    stroke="#f0c878"
+                    strokeWidth="3"
+                    strokeDasharray="2 5"
+                    strokeLinecap="round"
+                  />
                   <text x="40" y="20" fill="currentColor" fontSize="12">
                     {money(maximum)}
                   </text>
@@ -197,8 +213,9 @@ export function BudgetCharts({
                 </svg>
               </a>
               <p>
-                Solid: cleared spending · Dashed: even daily plan pace. “Ahead
-                of planned pace” is not the same as exceeding the monthly limit.
+                Solid: cleared spending · Dotted amber: cleared plus pending /
+                planned · Dashed purple: even daily plan pace. “Ahead of planned
+                pace” is not the same as exceeding the monthly limit.
               </p>
             </>
           )}
@@ -231,6 +248,7 @@ export function BudgetCharts({
                     <th>Date</th>
                     <th>Planned cumulative pace</th>
                     <th>Cleared cumulative spending</th>
+                    <th>Cleared plus pending / planned</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -243,6 +261,7 @@ export function BudgetCharts({
                           ? "Future — no actuals"
                           : money(day.actual)}
                       </td>
+                      <td>{money(day.withPending)}</td>
                     </tr>
                   ))}
                 </tbody>

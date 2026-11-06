@@ -1,3 +1,4 @@
+import { manualEntryFlow } from "../e2e/helpers/manual-entry-flow";
 import { savedPageFlow } from "../e2e/helpers/saved-page-flow";
 import { openReview } from "../e2e/helpers/open-review";
 import { ownerFeedbackFlow } from "../e2e/helpers/owner-feedback-flow";
@@ -232,4 +233,11 @@ test("unfinished page saves encrypted and resumes a same-day transaction without
 }) => {
   await signup(page, `saved-page-${crypto.randomUUID()}@example.test`);
   await savedPageFlow(page, approve);
+});
+
+test("verified manual entry choices and pending-to-cleared transitions stay consistent", async ({
+  page,
+}) => {
+  await signup(page, `flexible-manual-${crypto.randomUUID()}@example.test`);
+  await manualEntryFlow(page, approve);
 });

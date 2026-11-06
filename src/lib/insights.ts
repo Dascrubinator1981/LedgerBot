@@ -1,7 +1,8 @@
-import { afterOpening } from "./domain";
+import { affectsBalance } from "./domain";
 import {
   addDays,
   sumMoney,
+  budgetPending,
   liability,
   type Account,
   type FinanceState,
@@ -55,7 +56,8 @@ export function budgetProgress(
   const budgets = state.budgets.filter((b) => b.month === month),
     targetIds = new Set(budgets.map((b) => b.categoryId));
   const categoryAmounts = new Map<string, number[]>(),
-    daily = new Map<string, number[]>();
+    daily = new Map<string, number[]>(),
+    pendingDaily = new Map<string, number[]>();
   const uncategorized: number[] = [],
     unbudgeted: number[] = [],
     pending: number[] = [],
@@ -68,7 +70,13 @@ export function budgetProgress(
       (t.amount < 0 || t.flow === "refund" || (!t.flow && t.splits.length > 0));
     if (!t.flow && t.amount > 0) unclassifiedPositive.push(t.amount);
     if (t.status === "pending") {
-      if (spending) pending.push(-t.amount);
+      if (spending) {
+        pending.push(-t.amount);
+        pendingDaily.set(t.date, [
+          ...(pendingDaily.get(t.date) || []),
+          -t.amount,
+        ]);
+      }
       continue;
     }
     if (t.status !== "cleared" || !spending) continue;
@@ -86,6 +94,7 @@ export function budgetProgress(
   }
   const rows = budgets.map((b) => {
     const actual = sumMoney(categoryAmounts.get(b.categoryId) || []),
+      pendingAmount = budgetPending(b.categoryId, month, state.transactions),
       expected = Number((BigInt(b.target) * BigInt(elapsed)) / BigInt(count));
     return {
       id: b.id,
@@ -95,26 +104,36 @@ export function budgetProgress(
       categoryId: b.categoryId,
       target: b.target,
       actual,
+      pending: pendingAmount,
+      remainingAfterPending: sumMoney([b.target, -actual, -pendingAmount]),
       expected,
       remaining: sumMoney([b.target, -actual]),
       status:
         actual > b.target
           ? "Over budget"
-          : actual > expected && elapsed < count
-            ? "Ahead of planned pace"
-            : "On plan",
+          : sumMoney([actual, pendingAmount]) > b.target
+            ? "Pending would exceed plan"
+            : actual > expected && elapsed < count
+              ? "Ahead of planned pace"
+              : "On plan",
     };
   });
   const totalTarget = sumMoney(rows.map((r) => r.target)),
     totalActual = sumMoney(allSpending);
-  let running = 0;
+  let running = 0,
+    pendingRunning = 0;
   const series = Array.from({ length: count }, (_, i) => {
     const day = `${month}-${String(i + 1).padStart(2, "0")}`;
     running = sumMoney([running, ...(daily.get(day) || [])]);
+    pendingRunning = sumMoney([
+      pendingRunning,
+      ...(pendingDaily.get(day) || []),
+    ]);
     return {
       date: day,
       planned: Number((BigInt(totalTarget) * BigInt(i + 1)) / BigInt(count)),
       actual: day > today ? null : running,
+      withPending: sumMoney([running, pendingRunning]),
     };
   });
   const expectedToDate = Number(
@@ -130,14 +149,21 @@ export function budgetProgress(
     unbudgeted: sumMoney(unbudgeted),
     unclassifiedPositive: sumMoney(unclassifiedPositive),
     pending: sumMoney(pending),
+    remainingAfterPending: sumMoney([
+      totalTarget,
+      -totalActual,
+      -sumMoney(pending),
+    ]),
     configured: rows.length > 0,
     status: !rows.length
       ? "Not set up yet"
       : totalActual > totalTarget
         ? "Over budget"
-        : totalActual > expectedToDate && elapsed < count
-          ? "Ahead of planned pace"
-          : "On plan",
+        : sumMoney([totalActual, ...pending]) > totalTarget
+          ? "Pending would exceed plan"
+          : totalActual > expectedToDate && elapsed < count
+            ? "Ahead of planned pace"
+            : "On plan",
   };
 }
 export function runningBalances(account: Account, transactions: Transaction[]) {
@@ -148,17 +174,23 @@ export function runningBalances(account: Account, transactions: Transaction[]) {
   let signed =
     account.opening === null
       ? null
-      : account.opening * (liability(account) ? -1 : 1);
+      : sumMoney([
+          account.opening * (liability(account) ? -1 : 1),
+          ...sorted
+            .filter(
+              (t) =>
+                t.date < account.asOf &&
+                t.status === "cleared" &&
+                affectsBalance(account, t),
+            )
+            .map((t) => t.amount),
+        ]);
   for (const t of sorted) {
     if (t.date < account.asOf) {
       values.set(t.id, null);
       continue;
     }
-    if (
-      signed !== null &&
-      afterOpening(account, t.date) &&
-      t.status === "cleared"
-    )
+    if (signed !== null && affectsBalance(account, t) && t.status === "cleared")
       signed = sumMoney([signed, t.amount]);
     values.set(
       t.id,

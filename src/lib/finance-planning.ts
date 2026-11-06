@@ -1,5 +1,5 @@
 import { periodBudgetTarget } from "./budget-period";
-import { afterOpening } from "./domain";
+import { afterOpening, affectsBalance, balanceAnchor } from "./domain";
 import { randomUUID } from "node:crypto";
 import { z } from "./schema";
 import {
@@ -9,6 +9,7 @@ import {
   transactionRecordSchema,
   sumMoney,
   type FinanceState,
+  type Account,
   type SingleOperation as Operation,
   type Occurrence,
   type Recurrence,
@@ -51,9 +52,96 @@ export async function normalizePlanning(
   userId: string,
   op: Operation,
 ): Promise<Operation> {
+  const accountFor = async (id: string) => {
+    const row = (await db
+      .prepare("SELECT data FROM accounts WHERE id=? AND user_id=?")
+      .get(id, userId)) as { data: string } | undefined;
+    if (!row) throw new PublicError("Record unavailable");
+    return JSON.parse(row.data) as Account;
+  };
+  const anchorFor = async (id: string) => balanceAnchor(await accountFor(id));
+  const pendingTreatment = async (entry: Transaction) => {
+    const account = await accountFor(entry.accountId);
+    return {
+      balanceImpact: affectsBalance(account, entry)
+        ? ("additional" as const)
+        : ("included" as const),
+      balanceAnchor: balanceAnchor(account),
+    };
+  };
+  if (op.kind === "correctOpening")
+    op = { ...op, openingVersion: randomUUID() };
+  if (
+    (op.kind === "transaction" || op.kind === "editTransaction") &&
+    op.balanceImpact
+  )
+    op = { ...op, balanceAnchor: await anchorFor(op.accountId) };
+  if (op.kind === "transfer" || op.kind === "editTransfer")
+    op = {
+      ...op,
+      fromBalanceAnchor: op.fromBalanceImpact
+        ? await anchorFor(op.fromId)
+        : undefined,
+      toBalanceAnchor: op.toBalanceImpact
+        ? await anchorFor(op.toId)
+        : undefined,
+    };
+  if (
+    op.kind === "editTransfer" &&
+    (op.fromBalanceImpact === undefined || op.toBalanceImpact === undefined)
+  ) {
+    const rows = (await db
+      .prepare("SELECT data FROM transactions WHERE user_id=?")
+      .all(userId)) as { data: string }[];
+    const records = rows.map((row) => JSON.parse(row.data) as Transaction),
+      selectedId = op.id,
+      selected = records.find((t) => t.id === selectedId);
+    const pair = selected?.transferId
+      ? records.filter((t) => t.transferId === selected.transferId)
+      : [];
+    const from = pair.find((t) => t.amount < 0),
+      to = pair.find((t) => t.amount > 0);
+    if (op.fromBalanceImpact === undefined && from?.accountId === op.fromId) {
+      const treatment =
+        from.status === "pending" ? await pendingTreatment(from) : from;
+      op = {
+        ...op,
+        fromBalanceImpact: treatment.balanceImpact,
+        fromBalanceAnchor: treatment.balanceAnchor,
+      };
+    }
+    if (op.toBalanceImpact === undefined && to?.accountId === op.toId) {
+      const treatment =
+        to.status === "pending" ? await pendingTreatment(to) : to;
+      op = {
+        ...op,
+        toBalanceImpact: treatment.balanceImpact,
+        toBalanceAnchor: treatment.balanceAnchor,
+      };
+    }
+  }
   if (op.kind === "category" && !op.id) op = { ...op, id: randomUUID() };
   if (op.kind === "budget" && op.period)
     op = { ...op, target: periodBudgetTarget(op.month, op.period).target };
+  if (op.kind === "editTransaction" && op.balanceImpact === undefined) {
+    const row = (await db
+      .prepare("SELECT data FROM transactions WHERE id=? AND user_id=?")
+      .get(op.id, userId)) as { data: string } | undefined;
+    const old = row ? (JSON.parse(row.data) as Transaction) : undefined;
+    if (
+      old &&
+      old.accountId === op.accountId &&
+      (old.balanceImpact || old.status === "pending")
+    ) {
+      const treatment =
+        old.status === "pending" ? await pendingTreatment(old) : old;
+      op = {
+        ...op,
+        balanceImpact: treatment.balanceImpact,
+        balanceAnchor: treatment.balanceAnchor,
+      };
+    }
+  }
   if (op.kind === "editTransaction" && op.flow === undefined) {
     const row = (await db
       .prepare("SELECT data FROM transactions WHERE id=? AND user_id=?")
@@ -261,12 +349,17 @@ export async function validatePlanning(
       throw new PublicError("A reconciled transfer cannot be rewritten");
     if (op.fromId === op.toId)
       throw new PublicError("Choose two different accounts");
-    for (const id of [op.fromId, op.toId]) {
+    for (const [id, impact] of [
+      [op.fromId, op.fromBalanceImpact],
+      [op.toId, op.toBalanceImpact],
+    ] as const) {
       const a = account(id);
-      if (!afterOpening(a, op.date) || op.date > today)
+      if (!afterOpening(a, op.date) && !impact)
         throw new PublicError(
-          "Transfer date must follow the snapshot and be no later than today",
+          "Choose how the transfer affects each account’s starting balance",
         );
+      if (op.date > today && op.status !== "pending")
+        throw new PublicError("Future transfers must stay Pending / planned");
       await unlocked(db, userId, id, op.date);
     }
     if (op.occurrence)
@@ -290,9 +383,10 @@ export async function validatePlanning(
         "Only an unreconciled pending pair can be marked cleared",
       );
     for (const leg of pair) {
-      if (!afterOpening(account(leg.accountId), op.date) || op.date > today)
+      account(leg.accountId);
+      if (op.date > today)
         throw new PublicError(
-          "Cleared date must be after the opening snapshot and no later than today",
+          "Choose today or an earlier date when marking a transfer Cleared",
         );
       await unlocked(db, userId, leg.accountId, op.date);
     }
@@ -317,8 +411,7 @@ export async function validatePlanning(
       )
         throw new PublicError("These records have already been restored");
       if (
-        !afterOpening(a, entry.date) ||
-        entry.date > today ||
+        (entry.date > today && entry.status !== "pending") ||
         entry.reconciledAt
       )
         throw new PublicError(
@@ -408,6 +501,8 @@ export async function applyPlanning(
           date: op.date,
           status: op.status,
           description: op.description,
+          balanceImpact: from ? op.fromBalanceImpact : op.toBalanceImpact,
+          balanceAnchor: from ? op.fromBalanceAnchor : op.toBalanceAnchor,
           occurrence: from ? op.occurrence : null,
         };
         if (next.occurrence)
@@ -429,6 +524,7 @@ export async function applyPlanning(
           : {
               ...old,
               opening: op.opening,
+              openingVersion: op.openingVersion,
               asOf: op.asOf,
               openingBasis: op.openingBasis || old.openingBasis || "end-of-day",
             };
@@ -506,7 +602,20 @@ export async function applyPlanning(
         await db
           .prepare("UPDATE transactions SET data=? WHERE id=? AND user_id=?")
           .run(
-            JSON.stringify({ ...leg, status: "cleared", date: op.date }),
+            JSON.stringify({
+              ...leg,
+              status: "cleared",
+              date: op.date,
+              balanceImpact: affectsBalance(
+                s.accounts.find((a) => a.id === leg.accountId)!,
+                leg,
+              )
+                ? "additional"
+                : "included",
+              balanceAnchor: balanceAnchor(
+                s.accounts.find((a) => a.id === leg.accountId)!,
+              ),
+            }),
             leg.id,
             userId,
           );

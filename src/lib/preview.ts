@@ -1,5 +1,7 @@
 import {
   balance,
+  affectsBalance,
+  balanceAnchor,
   forecast,
   civilToday,
   addDays,
@@ -47,6 +49,7 @@ export function financialImpact(state: FinanceState, op: Operation): Impact {
           : {
               ...accounts[index],
               opening: op.opening,
+              openingVersion: op.openingVersion || "preview-new-checkpoint",
               asOf: op.asOf,
               openingBasis:
                 op.openingBasis || accounts[index].openingBasis || "end-of-day",
@@ -93,13 +96,30 @@ export function financialImpact(state: FinanceState, op: Operation): Impact {
         transferId: "preview-transfer",
         reconciledAt: null,
         splits: [],
+        balanceImpact:
+          accountId === op.fromId ? op.fromBalanceImpact : op.toBalanceImpact,
+        balanceAnchor:
+          accountId === op.fromId ? op.fromBalanceAnchor : op.toBalanceAnchor,
         ...(amount < 0 && op.occurrence ? { occurrence: op.occurrence } : {}),
       } satisfies Transaction);
   if (op.kind === "settleTransfer") {
     const old = transactions.find((t) => t.id === op.id);
     transactions = transactions.map((t) =>
       t.transferId === old?.transferId
-        ? { ...t, date: op.date, status: "cleared" }
+        ? {
+            ...t,
+            date: op.date,
+            status: "cleared",
+            balanceImpact: affectsBalance(
+              accounts.find((a) => a.id === t.accountId)!,
+              t,
+            )
+              ? ("additional" as const)
+              : ("included" as const),
+            balanceAnchor: balanceAnchor(
+              accounts.find((a) => a.id === t.accountId)!,
+            ),
+          }
         : t,
     );
   }
@@ -115,6 +135,10 @@ export function financialImpact(state: FinanceState, op: Operation): Impact {
             status: op.status,
             date: op.date,
             description: op.description,
+            balanceImpact:
+              t.amount < 0 ? op.fromBalanceImpact : op.toBalanceImpact,
+            balanceAnchor:
+              t.amount < 0 ? op.fromBalanceAnchor : op.toBalanceAnchor,
             occurrence: t.amount < 0 ? op.occurrence : null,
           },
     );

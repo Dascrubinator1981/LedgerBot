@@ -112,3 +112,31 @@ it("uses Sunday-Saturday and never counts internal transfers as paid expenses", 
   expect(rows[0].balances[0].amount).toBe(99000);
   expect(rows).toHaveLength(2);
 });
+
+it("includes approved pending spending in budget pressure without calling it cleared or treating bills as discretionary yellow", () => {
+  const s = base();
+  s.transactions.push({
+    id: "planned",
+    accountId: "cash",
+    date: "2026-11-07",
+    description: "Synthetic planned grocery",
+    amount: -9000,
+    status: "pending",
+    flow: "expense",
+    transferId: null,
+    reconciledAt: null,
+    splits: [{ categoryId: "food", amount: -9000 }],
+  });
+  expect(forecastAssessment(s, "2026-11-06").level).toBe("yellow");
+  s.transactions[0].occurrence = {
+    recurrenceId: "bill",
+    dueDate: "2026-11-10",
+    settles: true,
+  };
+  expect(forecastAssessment(s, "2026-11-06").level).toBe("green");
+  s.transactions[0].amount = -11000;
+  s.transactions[0].splits[0].amount = -11000;
+  const result = forecastAssessment(s, "2026-11-06");
+  expect(result.level).toBe("red");
+  expect(result.reasons.join(" ")).toContain("not cleared spending yet");
+});

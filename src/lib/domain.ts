@@ -24,7 +24,10 @@ export const occurrenceRefSchema = z.object({
   dueDate: date,
   settles: z.boolean(),
 });
+export const balanceImpactSchema = z.enum(["additional", "included"]);
 const transactionFields = {
+  balanceImpact: balanceImpactSchema.optional(),
+  balanceAnchor: z.string().max(300).optional(),
   flow: z.enum(["income", "expense", "refund"]).optional(),
   accountId: id,
   date,
@@ -79,6 +82,10 @@ export const singleOperationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("deleteTransaction"), id }),
   z.object({
     kind: z.literal("transfer"),
+    fromBalanceImpact: balanceImpactSchema.optional(),
+    toBalanceImpact: balanceImpactSchema.optional(),
+    fromBalanceAnchor: z.string().max(300).optional(),
+    toBalanceAnchor: z.string().max(300).optional(),
     fromId: id,
     toId: id,
     amount: minor.refine((v) => v > 0),
@@ -114,6 +121,7 @@ export const singleOperationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("renameCategory"), id, name }),
   z.object({
     kind: z.literal("correctOpening"),
+    openingVersion: z.uuid().optional(),
     id,
     opening: minor.nullable(),
     asOf: date,
@@ -138,6 +146,10 @@ export const singleOperationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("settleTransfer"), id, date }),
   z.object({
     kind: z.literal("editTransfer"),
+    fromBalanceImpact: balanceImpactSchema.optional(),
+    toBalanceImpact: balanceImpactSchema.optional(),
+    fromBalanceAnchor: z.string().max(300).optional(),
+    toBalanceAnchor: z.string().max(300).optional(),
     id,
     fromId: id,
     toId: id,
@@ -216,9 +228,12 @@ export type Account = {
   opening: number | null;
   asOf: string;
   currency: string;
+  openingVersion?: string;
   openingBasis?: "start-of-day" | "end-of-day";
 };
 export type Transaction = {
+  balanceImpact?: "additional" | "included";
+  balanceAnchor?: string;
   flow?: "income" | "expense" | "refund";
   id: string;
   accountId: string;
@@ -417,6 +432,33 @@ export function afterOpening(account: Account, day: string): boolean {
     (day === account.asOf && account.openingBasis === "start-of-day")
   );
 }
+// A choice applies to one reviewed balance checkpoint, not all future snapshots.
+export function balanceAnchor(account: Account): string {
+  return JSON.stringify([
+    account.id,
+    account.asOf,
+    account.opening === null
+      ? null
+      : account.opening * (liability(account) ? -1 : 1),
+    account.openingBasis || "end-of-day",
+    account.openingVersion || "legacy",
+  ]);
+}
+export function affectsBalance(
+  account: Account,
+  transaction: Pick<Transaction, "date" | "balanceImpact" | "balanceAnchor"> & {
+    status?: string;
+  },
+): boolean {
+  if (
+    transaction.balanceImpact &&
+    transaction.balanceAnchor === balanceAnchor(account)
+  )
+    return transaction.balanceImpact === "additional";
+  // A cleared-balance checkpoint does not silently consume uncleared plans.
+  if (transaction.status === "pending") return true;
+  return afterOpening(account, transaction.date);
+}
 export function balance(
   account: Account,
   transactions: Transaction[],
@@ -430,7 +472,7 @@ export function balance(
         (t) =>
           t.accountId === account.id &&
           t.status === "cleared" &&
-          afterOpening(account, t.date) &&
+          affectsBalance(account, t) &&
           t.date <= through,
       )
       .map((t) => t.amount),
@@ -469,6 +511,25 @@ export function budgetActual(
       .map((s) => s.amount),
   );
   return actual === 0 ? 0 : -actual;
+}
+export function budgetPending(
+  categoryId: string,
+  month: string,
+  transactions: Transaction[],
+): number {
+  return -sumMoney(
+    transactions
+      .filter(
+        (t) =>
+          t.status === "pending" &&
+          !t.transferId &&
+          t.flow !== "income" &&
+          t.date.startsWith(month),
+      )
+      .flatMap((t) => t.splits)
+      .filter((s) => s.categoryId === categoryId)
+      .map((s) => s.amount),
+  );
 }
 export function addDays(day: string, count: number): string {
   const d = new Date(`${day}T00:00:00Z`);
@@ -597,7 +658,9 @@ export function forecast(
       });
   }
   for (const t of state.transactions.filter(
-    (t) => t.status === "pending" && cash.some((a) => a.id === t.accountId),
+    (t) =>
+      t.status === "pending" &&
+      cash.some((a) => a.id === t.accountId && affectsBalance(a, t)),
   ))
     events.push({
       date: t.date > today ? t.date : addDays(today, 1),

@@ -448,7 +448,8 @@ export function AccountTools({
           cannot rewrite a reconciled account. The date can be earlier than when
           you added the account. Starting balance counts same-day entries; a
           closing snapshot includes them already. Check the exact before/after
-          balance in review.
+          balance in review. Changing the starting balance re-evaluates older
+          entries; check all resulting balances before confirming.
         </p>
         <div className="fields">
           <AccountSelect

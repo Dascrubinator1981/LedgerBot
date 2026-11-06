@@ -36,6 +36,9 @@ export function forecastAssessment(state: FinanceState, today: string) {
     ),
   );
   const over = budget.rows.filter((r) => r.actual > r.target);
+  const pendingOver = budget.rows.filter(
+    (r) => sumMoney([r.actual, r.pending]) > r.target,
+  );
   const near = budget.rows.filter(
     (r) =>
       r.target > 0 &&
@@ -44,7 +47,7 @@ export function forecastAssessment(state: FinanceState, today: string) {
           state.transactions
             .filter(
               (t) =>
-                t.status === "cleared" &&
+                (t.status === "cleared" || t.status === "pending") &&
                 !t.transferId &&
                 !t.occurrence &&
                 t.flow !== "income" &&
@@ -67,6 +70,17 @@ export function forecastAssessment(state: FinanceState, today: string) {
   if (low.length && !shortages.length)
     reasons.push("An account falls below your configured cash cushion.");
   if (over.length) reasons.push("A budget category exceeds its target.");
+  if (budget.configured && budget.totalActual > budget.totalTarget)
+    reasons.push("Cleared spending exceeds the overall budget plan.");
+  if (
+    (pendingOver.length ||
+      (budget.configured &&
+        sumMoney([budget.totalActual, budget.pending]) > budget.totalTarget)) &&
+    !over.length
+  )
+    reasons.push(
+      "Pending / planned spending would exceed a budget target. It is not cleared spending yet.",
+    );
   const incomplete =
     !cash.length ||
     state.accounts.some(

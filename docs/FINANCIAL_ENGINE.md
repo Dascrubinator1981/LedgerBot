@@ -1,5 +1,7 @@
 > Current staged implementation: see [STAGED_IMPLEMENTATION_REPORT.md](STAGED_IMPLEMENTATION_REPORT.md), [Stage 1](STAGE_1_REPORT.md), [Stage 2](STAGE_2_REPORT.md), [Stage 3](STAGE_3_REPORT.md), and [operations](OPERATIONS.md). The original milestone/audit below is historical; later reports supersede its feature-status statements.
 
+Current manual-entry rules and pending projections: [MANUAL_AND_CONNECTED_RECORDS.md](MANUAL_AND_CONNECTED_RECORDS.md). Explicit per-entry inclusion tied to the current checkpoint overrides the older date-only formula below; legacy records retain date-based cleared balances, and uncleared plans remain reserved unless explicitly included.
+
 # Financial conventions
 
 - USD only. Safe integer cents, each input bounded to ±100 billion cents. Decimal strings parsed as whole/fractional digits, never floating point dollars. No real financial fixtures.

@@ -94,12 +94,15 @@ export async function ownerFeedbackFlow(
   await expect(page.getByLabel("Description", { exact: true })).toHaveValue(
     "Fictional split purchase",
   );
-  // Pending cannot bypass the future-date rule or silently post this purchase.
+  // A future payment can be planned without becoming a cleared actual.
   await page.getByLabel("Status", { exact: true }).selectOption("pending");
   await prepare.click();
-  await expect(form.getByRole("alert")).toContainText(
-    "does not allow future dates",
-  );
+  await expect(
+    page.getByRole("region", { name: "Page changes" }),
+  ).toContainText("1 prepared change");
+  await page
+    .getByRole("button", { name: "Edit change 1", exact: true })
+    .click();
   expect(
     (await (await page.request.get("/api/state")).json()).transactions,
   ).toHaveLength(0);

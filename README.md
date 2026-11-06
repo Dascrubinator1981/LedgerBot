@@ -89,3 +89,5 @@ Current staged behavior and executed validation: [November 6 update](docs/TODAY_
 To record a reproducible issue without private financial values, see [Troubleshooting](docs/TROUBLESHOOTING.md). Shared-household approvals remain [planned](docs/HOUSEHOLD_APPROVAL_PLAN.md), not implemented.
 
 The Ledger now opens on its transaction register. See the [Ledger update and test-account logging walkthrough](docs/LEDGER_REGISTER_REPORT.md).
+
+Manual same-day/history entries and dotted pending budgets: [current update](docs/MANUAL_ENTRY_UPDATE_REPORT.md). Bank/receipt source preservation and friendly labels remain a [planned integration layer](docs/MANUAL_AND_CONNECTED_RECORDS.md).

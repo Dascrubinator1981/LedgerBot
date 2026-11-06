@@ -58,3 +58,7 @@ Apply PostgreSQL migration `008_forecast_preferences.sql` (SQLite migration vers
 ## Local saved-review key
 
 SQLite saved reviews use an AES-GCM key in a matching `.draft-key` file beside the database (created with restrictive permissions where supported). Preserve the database and key together in private backups. Do not commit, upload or delete either to update. PostgreSQL uses the existing versioned server key ring. Expiry stops approval and removes active Inbox items; it does not securely erase retained history. Hosted retention and erasure policy remains a beta gate.
+
+## Manual-entry model compatibility
+
+The current version reads legacy rows and optional per-entry balance treatment/checkpoint identities. Keep account JSON and transaction JSON together in backups. Do not downgrade to a date-only balance reader after creating new inclusion choices; it can display incorrect balances even though SQL schemas are unchanged. A rollback requires a reviewed compatibility/data plan and exact-balance verification. Outstanding pending commitments must survive checkpoint replacement and pending-to-cleared edits. Current behavior and evidence: [MANUAL_ENTRY_UPDATE_REPORT.md](MANUAL_ENTRY_UPDATE_REPORT.md).

@@ -10,12 +10,15 @@ import {
 } from "./components";
 import {
   balance,
+  affectsBalance,
+  budgetPending,
   civilToday,
   budgetActual,
   forecast,
   liability,
   money,
   parseMoney,
+  sumMoney,
   type FinanceState,
   type Operation,
   type Proposal,
@@ -1049,7 +1052,7 @@ export default function Workspace() {
                   >
                     <option value="">All statuses</option>
                     <option value="cleared">Cleared</option>
-                    <option value="pending">Pending</option>
+                    <option value="pending">Pending / planned</option>
                   </select>
                 </Field>
                 <Field label="Search description">
@@ -1151,8 +1154,16 @@ export default function Workspace() {
                             {money(t.amount)}
                           </td>
                           <td role="cell" data-label="Status">
-                            {t.status}
+                            {t.status === "pending"
+                              ? "Pending / planned"
+                              : "Cleared"}
                             {t.reconciledAt && " · reconciled"}
+                            {!affectsBalance(a, t) && (
+                              <small>
+                                {" "}
+                                · Already included in starting balance
+                              </small>
+                            )}
                           </td>
                           <td role="cell" data-label="Cleared running balance">
                             {money(running.get(t.id) ?? null)}
@@ -1226,9 +1237,9 @@ export default function Workspace() {
                   uncategorized.
                 </p>
                 <p>
-                  Today is {currentDay} in {state.settings.timezone}. Use today
-                  or an earlier date. Pending means already paid, but not yet
-                  cleared by your bank.
+                  Today is {currentDay} in {state.settings.timezone}. Future
+                  entries stay Pending / planned. Mark an entry Cleared when it
+                  has actually completed.
                 </p>
                 <form
                   data-financial="true"
@@ -1258,6 +1269,9 @@ export default function Workspace() {
                         date: str(f, "date"),
                         description: str(f, "description"),
                         amount,
+                        balanceImpact: f.has("includedInOpening")
+                          ? "included"
+                          : "additional",
                         status: str(f, "status") as "pending" | "cleared",
                         splits,
                         flow:
@@ -1299,7 +1313,7 @@ export default function Workspace() {
                         defaultValue={edit?.status || "cleared"}
                       >
                         <option value="cleared">Cleared</option>
-                        <option value="pending">Pending</option>
+                        <option value="pending">Pending / planned</option>
                       </select>
                     </Field>
                   </div>
@@ -1313,6 +1327,30 @@ export default function Workspace() {
                       <option value="refund">Refund of spending</option>
                     </select>
                   </Field>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      name="includedInOpening"
+                      defaultChecked={
+                        edit
+                          ? !affectsBalance(
+                              accounts.find((a) => a.id === edit.accountId)!,
+                              edit,
+                            )
+                          : false
+                      }
+                    />
+                    Already included in my starting balance
+                  </label>
+                  <p>
+                    <small>
+                      Leave this off for a new purchase or deposit. Turn it on
+                      for history your starting balance already includes. It
+                      still counts in your budget without changing the balance
+                      twice. Pending entries appear in planning and change the
+                      cleared balance only when marked Cleared.
+                    </small>
+                  </p>
                   <SplitFields
                     state={entryState}
                     edit={edit}
@@ -1368,6 +1406,12 @@ export default function Workspace() {
                         fromId: str(f, "fromId"),
                         toId: str(f, "toId"),
                         amount: parseMoney(str(f, "amount")),
+                        fromBalanceImpact: f.has("fromIncluded")
+                          ? "included"
+                          : "additional",
+                        toBalanceImpact: f.has("toIncluded")
+                          ? "included"
+                          : "additional",
                         date: str(f, "date"),
                         description: str(f, "description"),
                         status: str(f, "status") as "cleared" | "pending",
@@ -1411,10 +1455,48 @@ export default function Workspace() {
                         defaultValue={pairFrom?.status || "cleared"}
                       >
                         <option value="cleared">Cleared</option>
-                        <option value="pending">Pending</option>
+                        <option value="pending">Pending / planned</option>
                       </select>
                     </Field>
                   </div>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      name="fromIncluded"
+                      defaultChecked={
+                        pairFrom
+                          ? !affectsBalance(
+                              accounts.find(
+                                (a) => a.id === pairFrom.accountId,
+                              )!,
+                              pairFrom,
+                            )
+                          : false
+                      }
+                    />
+                    From account starting balance already includes this transfer
+                  </label>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      name="toIncluded"
+                      defaultChecked={
+                        pairTo
+                          ? !affectsBalance(
+                              accounts.find((a) => a.id === pairTo.accountId)!,
+                              pairTo,
+                            )
+                          : false
+                      }
+                    />
+                    To account starting balance already includes this transfer
+                  </label>
+                  <p>
+                    <small>
+                      Choose independently for each account. Pending / planned
+                      transfers change projections, not cleared balances.
+                    </small>
+                  </p>
                   <OccurrenceFields
                     state={state}
                     prefix="transferBill"
@@ -1510,6 +1592,11 @@ export default function Workspace() {
                     b.month,
                     transactions,
                   );
+                  const pending = budgetPending(
+                    b.categoryId,
+                    b.month,
+                    transactions,
+                  );
                   return (
                     <section className="card" key={b.id}>
                       <h2>
@@ -1529,7 +1616,13 @@ export default function Workspace() {
                       )}
                       <p>Cleared actuals: {money(actual)}</p>
                       <p>
-                        Remaining against target: {money(b.target - actual)}
+                        Pending / planned: {money(pending)} · Remaining after
+                        pending:{" "}
+                        {money(sumMoney([b.target, -actual, -pending]))}
+                      </p>
+                      <p>
+                        Remaining against target:{" "}
+                        {money(sumMoney([b.target, -actual]))}
                       </p>
                     </section>
                   );
