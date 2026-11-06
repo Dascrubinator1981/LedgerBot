@@ -251,7 +251,8 @@ export function Review({
     null,
   );
   const [position, setPosition] = useState(0),
-    [stage, setStage] = useState(1);
+    [stage, setStage] = useState(1),
+    [slideHint, setSlideHint] = useState("");
   useEffect(() => {
     const element = dialog.current;
     element?.showModal();
@@ -362,8 +363,10 @@ export function Review({
               style={{ transform: `translateX(${position}px)` }}
               onPointerDown={(e) => {
                 if (!e.isTrusted || !track.current) return;
-                const width = track.current.clientWidth - 64;
+                const width =
+                  track.current.clientWidth - e.currentTarget.offsetWidth - 8;
                 if (width <= 0) return;
+                setSlideHint("");
                 drag.current = {
                   pointer: e.pointerId,
                   start: e.clientX,
@@ -385,10 +388,17 @@ export function Review({
                   );
               }}
               onPointerCancel={() => {
+                setSlideHint(
+                  "Slide cancelled. Nothing saved. You can use accessible confirmation below.",
+                );
                 drag.current = null;
                 setPosition(0);
               }}
               onLostPointerCapture={() => {
+                if (drag.current)
+                  setSlideHint(
+                    "Slide interrupted. Nothing saved. You can use accessible confirmation below.",
+                  );
                 drag.current = null;
                 setPosition(0);
               }}
@@ -407,13 +417,20 @@ export function Review({
                   e.clientY >= bounds.top &&
                   e.clientY <= bounds.bottom &&
                   !busy
-                )
+                ) {
+                  setSlideHint("");
                   onConfirm();
+                } else if (d) {
+                  setSlideHint(
+                    "Nothing saved. Drag the arrow all the way right and release inside the bar, or use accessible confirmation below.",
+                  );
+                }
               }}
             >
               →
             </button>
           </div>
+          {slideHint && <p role="status">{slideHint}</p>}
           <button
             onClick={() => {
               drag.current = null;

@@ -167,6 +167,7 @@ test("slide requires release and aborted slide cannot commit", async ({
     steps: 8,
   });
   await page.mouse.up();
+  await expect(dialog.getByRole("status")).toContainText("Nothing saved");
   expect(
     (await (await page.request.get("/api/state")).json()).accounts,
   ).toHaveLength(0);
@@ -178,6 +179,7 @@ test("slide requires release and aborted slide cannot commit", async ({
     { steps: 8 },
   );
   await page.mouse.up();
+  await expect(dialog.getByRole("status")).toContainText("Nothing saved");
   expect(
     (await (await page.request.get("/api/state")).json()).accounts,
   ).toHaveLength(0);
