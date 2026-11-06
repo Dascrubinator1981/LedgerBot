@@ -17,23 +17,58 @@ export function CategorySelect({
   value?: string;
   required?: boolean;
   busy?: boolean;
-  onCreate?: (name: string) => void;
+  onCreate?: (name: string, form?: HTMLFormElement) => void;
 }) {
   const id = useId(),
     select = useRef<HTMLSelectElement>(null),
-    previous = useRef(value);
+    previous = useRef(value),
+    pendingName = useRef<string | null>(null);
   const [adding, setAdding] = useState(false),
     [draftName, setDraftName] = useState("");
   function reviewCategory() {
     if (busy || !draftName.trim()) return;
-    onCreate?.(draftName.trim());
-    setAdding(false);
-    select.current?.focus();
+    const existing = categories.find(
+      (c) =>
+        c.name.trim().toLocaleLowerCase() ===
+        draftName.trim().toLocaleLowerCase(),
+    );
+    if (existing) {
+      choose(existing.id);
+      return;
+    }
+    pendingName.current = draftName.trim();
+    onCreate?.(draftName.trim(), select.current?.form || undefined);
   }
+  function choose(id: string) {
+    previous.current = id;
+    pendingName.current = null;
+    if (select.current) {
+      select.current.value = id;
+      select.current.setCustomValidity("");
+      select.current.dispatchEvent(new Event("change", { bubbles: true }));
+      select.current.focus();
+    }
+    setAdding(false);
+  }
+  useEffect(() => {
+    const desired = pendingName.current;
+    const category = desired && categories.find((c) => c.name === desired);
+    if (category) queueMicrotask(() => choose(category.id));
+  }, [categories]);
+  useEffect(() => {
+    const element = select.current;
+    element?.setCustomValidity(
+      adding
+        ? "Finish adding this category, or choose Keep working without adding."
+        : "",
+    );
+    return () => element?.setCustomValidity("");
+  }, [adding]);
   useEffect(() => {
     const form = select.current?.form;
     const reset = () => {
       previous.current = value;
+      pendingName.current = null;
       setAdding(false);
       setDraftName("");
     };
@@ -66,13 +101,18 @@ export function CategorySelect({
       </select>
       {adding && (
         <div className="card">
+          <input type="hidden" name={`newCategoryMode:${name}`} value="open" />
           <label htmlFor={`${id}-new`}>
             New category for {label}
             <input
               id={`${id}-new`}
+              name={`newCategoryName:${name}`}
               maxLength={100}
               value={draftName}
-              onChange={(event) => setDraftName(event.target.value)}
+              onChange={(event) => {
+                pendingName.current = null;
+                setDraftName(event.target.value);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
@@ -80,6 +120,7 @@ export function CategorySelect({
                 }
                 if (event.key === "Escape") {
                   event.preventDefault();
+                  pendingName.current = null;
                   setAdding(false);
                   select.current?.focus();
                 }
@@ -91,14 +132,12 @@ export function CategorySelect({
             existing={categories.map((c) => c.name)}
             onUse={(name) => {
               const chosen = categories.find((c) => c.name === name)!;
-              previous.current = chosen.id;
-              if (select.current) select.current.value = chosen.id;
-              setAdding(false);
+              choose(chosen.id);
             }}
           />
           <p>
-            Your entry stays here while you review the category separately.
-            After approval, select it from the list. Nothing is added until you
+            Your entry stays here. The category joins your page review and is
+            selected automatically. Nothing is saved to your finances until you
             confirm.
           </p>
           <div className="actions">
@@ -113,6 +152,7 @@ export function CategorySelect({
               type="button"
               disabled={busy}
               onClick={() => {
+                pendingName.current = null;
                 setAdding(false);
                 select.current?.focus();
               }}

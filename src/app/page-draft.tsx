@@ -8,6 +8,7 @@ import {
   type formSnapshotSchema,
 } from "@/lib/domain";
 import type { z } from "@/lib/schema";
+import { originalDraftValues } from "@/lib/draft-fields";
 import type { Section } from "@/lib/navigation";
 type Snapshot = z.infer<typeof formSnapshotSchema>;
 type Destination = Section | "SignOut";
@@ -33,6 +34,7 @@ export function usePageDraft({
   onReview,
   refresh,
   onRestore,
+  onCancelEdit,
 }: {
   tab: Section;
   identity: string;
@@ -44,6 +46,7 @@ export function usePageDraft({
   onReview: (r: { proposal: Proposal; token: string }) => void;
   refresh: () => Promise<void>;
   onRestore: (snapshot: Snapshot) => void;
+  onCancelEdit: () => void;
 }) {
   const [items, setItems] = useState<Item[]>([]),
     [dirty, setDirty] = useState(false),
@@ -53,6 +56,7 @@ export function usePageDraft({
     [sourceId, setSourceId] = useState<string | undefined>(),
     [remainingRestores, setRemainingRestores] = useState<Snapshot[]>([]);
   const [boundIdentity, setBoundIdentity] = useState(identity);
+  const [editingChange, setEditingChange] = useState(false);
   const identityRef = useRef(identity);
   const owned = boundIdentity === identity;
   const dirtyForms = useRef(new Set<HTMLFormElement>()),
@@ -61,6 +65,7 @@ export function usePageDraft({
     index: number;
     operation: SingleOperation;
     formKey?: string;
+    originalSnapshot?: Snapshot;
   } | null>(null);
   const activeReview = useRef(false),
     preparedId = useRef<string | undefined>(undefined);
@@ -79,6 +84,7 @@ export function usePageDraft({
       resetForms.current.clear();
       preparedId.current = undefined;
       editingRepair.current = null;
+      setEditingChange(false);
       activeReview.current = false;
       setBoundIdentity(identity);
     });
@@ -116,6 +122,20 @@ export function usePageDraft({
       const disclosure = form.closest("details");
       if (disclosure) disclosure.open = true;
       let missing = false;
+      for (const [name, value] of restore.values) {
+        if (!name.startsWith("newCategoryMode:") || value !== "open") continue;
+        if (!form.elements.namedItem(name)) {
+          const select = form.elements.namedItem(
+            name.slice("newCategoryMode:".length),
+          );
+          if (select instanceof HTMLSelectElement) {
+            select.value = "+add";
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            missing = true;
+          }
+        }
+      }
+
       for (const control of Array.from(form.elements))
         if (
           control instanceof HTMLInputElement &&
@@ -200,6 +220,7 @@ export function usePageDraft({
             replaces: {
               index: editingRepair.current.index,
               operation: editingRepair.current.operation,
+              originalValues: editingRepair.current.originalSnapshot?.values,
             },
           }
         : {}),
@@ -267,13 +288,53 @@ export function usePageDraft({
         })),
     );
     setItems(nextItems);
-    if (repair) editingRepair.current = null;
+    if (repair) {
+      editingRepair.current = null;
+      setEditingChange(false);
+    }
     if (form) {
       resetForms.current.add(form);
       form.reset();
       dirtyForms.current.delete(form);
       setDirty(dirtyForms.current.size > 0);
     }
+  }
+  function cancelForm(form?: HTMLFormElement | null) {
+    if (form) {
+      dirtyForms.current.delete(form);
+      form.reset();
+    }
+    for (const item of dirtyForms.current)
+      if (!item.isConnected) dirtyForms.current.delete(item);
+    setDirty(dirtyForms.current.size > 0);
+  }
+  function cancelEditingChange() {
+    const repair = editingRepair.current;
+    if (!repair) return;
+    setRestore(null);
+    setRemainingRestores([]);
+    const form = Array.from(
+      document.querySelectorAll<HTMLFormElement>(
+        "#main-content form[data-financial]",
+      ),
+    ).find(
+      (f) =>
+        (f.dataset.draftForm ||
+          f.querySelector("button:not([type=button])")?.textContent?.trim()) ===
+        repair.formKey,
+    );
+    cancelForm(form);
+    setItems((current) => {
+      const next = [...current];
+      next.splice(Math.min(repair.index, next.length), 0, {
+        operation: repair.operation,
+        snapshot: repair.originalSnapshot,
+      });
+      return next;
+    });
+    editingRepair.current = null;
+    setEditingChange(false);
+    onCancelEdit();
   }
   function navigate(next: Destination) {
     if (next === tab) return;
@@ -317,6 +378,7 @@ export function usePageDraft({
     setItems([]);
     setSourceId(undefined);
     editingRepair.current = null;
+    setEditingChange(false);
   }
   function committed() {
     if (!activeReview.current) return;
@@ -356,8 +418,22 @@ export function usePageDraft({
     );
     if (unfinished) {
       editingRepair.current = unfinished.replaces
-        ? { ...unfinished.replaces, formKey: unfinished.formKey }
+        ? {
+            ...unfinished.replaces,
+            formKey: unfinished.formKey,
+            originalSnapshot: {
+              ...unfinished,
+              replaces: undefined,
+              values:
+                unfinished.replaces.originalValues ||
+                originalDraftValues(
+                  unfinished.replaces.operation,
+                  unfinished.values,
+                ),
+            },
+          }
         : null;
+      setEditingChange(!!unfinished.replaces);
       onRestore(unfinished);
     }
     setRestore(
@@ -418,6 +494,11 @@ export function usePageDraft({
             or discard them before leaving.
           </p>
         )}
+        {editingChange && (
+          <button type="button" disabled={busy} onClick={cancelEditingChange}>
+            Cancel editing this staged change
+          </button>
+        )}
         {items.map((item, index) => (
           <div className="row" key={index}>
             <span>
@@ -446,7 +527,9 @@ export function usePageDraft({
                       index,
                       operation: item.operation,
                       formKey: form.formKey,
+                      originalSnapshot: form,
                     };
+                    setEditingChange(true);
                     setRemainingRestores([]);
                     navigateNow(form.section as Section);
                     onRestore(form);
@@ -522,6 +605,9 @@ export function usePageDraft({
     panel: owned ? panel : null,
     dialog: owned ? dialog : null,
     add,
+    cancelForm,
+    cancelEditingChange,
+    editingChange: owned && editingChange,
     navigate,
     mark,
     committed,

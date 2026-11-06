@@ -346,6 +346,29 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
   await expect(
     page.getByLabel("From account", { exact: true }).locator("option:checked"),
   ).toHaveText("Synthetic checking · checking");
+  await page.getByLabel("Transfer amount ($, positive)").fill("0");
+  await page
+    .getByRole("button", {
+      name: "Prepare paired transfer changes",
+      exact: true,
+    })
+    .click();
+  await expect(page.getByLabel("Transfer amount ($, positive)")).toHaveValue(
+    "0",
+  );
+  await expect(
+    page.getByRole("button", { name: "Cancel pair edit", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Cancel pair edit", exact: true })
+    .click();
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await pairedRow.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(page.getByLabel("Transfer amount ($, positive)")).toHaveValue(
+    "30.00",
+  );
   await page
     .getByRole("button", {
       name: "Prepare paired transfer changes",
@@ -501,9 +524,9 @@ test("custom quick actions move only their strip and held swipes do not navigate
   });
   for (const box of await controls.getByRole("checkbox").all())
     await box.check();
-  await page.getByRole("button", { name: "Save Forecaster display" }).click();
+  await page.getByRole("button", { name: "Save forecast settings" }).click();
   await expect(page.getByRole("status")).toContainText(
-    "Forecaster display saved",
+    "Forecast settings saved",
   );
   await page.getByRole("link", { name: "Dashboard", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -654,4 +677,69 @@ test("manual same-day and historical entry choices keep pending, budget and clea
 }) => {
   await signup(page);
   await manualEntryFlow(page, approve);
+});
+
+test("plain-language settings and Dashboard entry shortcut retain independent preferences", async ({
+  page,
+}) => {
+  await signup(page);
+  await page
+    .getByRole("navigation", { name: "Forecast quick actions" })
+    .getByRole("button", { name: "Add Transaction", exact: true })
+    .click();
+  await expect(page.getByLabel("Description", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await page.getByLabel("How far ahead to look").selectOption("60");
+  await page
+    .getByLabel("Warn me when a balance falls below ($)")
+    .fill("125.34");
+  await page
+    .getByLabel("Warn me when category spending reaches (%)")
+    .fill("101");
+  await page
+    .getByRole("button", { name: "Save forecast settings", exact: true })
+    .click();
+  expect(
+    (await (await page.request.get("/api/state")).json()).settings.forecaster
+      ?.horizon ?? 30,
+  ).toBe(30);
+  await page
+    .getByLabel("Warn me when category spending reaches (%)")
+    .fill("90");
+  await page
+    .getByRole("button", { name: "Save forecast settings", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Forecast settings saved" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Use this device’s time zone", exact: true })
+    .click();
+  const zone = await page.evaluate(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
+  await expect(page.getByLabel("Your time zone", { exact: true })).toHaveValue(
+    zone,
+  );
+  await page
+    .getByRole("button", { name: "Save preferences", exact: true })
+    .click();
+  await page.reload();
+  const state = await (await page.request.get("/api/state")).json();
+  expect(state.settings.forecaster).toMatchObject({
+    horizon: 60,
+    lowBalanceCents: 12534,
+    nearBudgetPercent: 90,
+  });
+  expect(state.settings.timezone).toBe(zone);
+  expect(state.transactions).toEqual([]);
+  await page
+    .getByRole("button", { name: "Review export", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Cancel export", exact: true })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Export format", exact: true }),
+  ).toBeVisible();
 });

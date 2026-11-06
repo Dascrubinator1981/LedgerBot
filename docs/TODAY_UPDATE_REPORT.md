@@ -2,6 +2,8 @@
 
 This is a private development candidate, not a published application or a beta approval. Use invented financial information only.
 
+For the latest interaction and cancellation fixes and their current verification, see [APP_REVIEW_REPORT.md](APP_REVIEW_REPORT.md). The counts below are an older staged checkpoint.
+
 For the latest relaxed manual-entry rules, dotted pending-budget line and bank/receipt enrichment design, see [MANUAL_ENTRY_UPDATE_REPORT.md](MANUAL_ENTRY_UPDATE_REPORT.md).
 
 For the latest register-first Ledger and test-account troubleshooting walkthrough, see [LEDGER_REGISTER_REPORT.md](LEDGER_REGISTER_REPORT.md).

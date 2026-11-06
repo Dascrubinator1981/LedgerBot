@@ -26,26 +26,22 @@ export async function sessionFlow(
   await openReview(other);
   await expect(other.getByRole("dialog")).toBeVisible();
   await page.getByRole("link", { name: "Settings", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Refresh signed-in sessions" })
-    .click();
+  await page.getByRole("button", { name: "Refresh login list" }).click();
   await expect(page.getByText(/Current sign-in · Started/)).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Review revoking this sign-in" }),
+    page.getByRole("button", { name: "Review signing out this login" }),
   ).toHaveCount(1);
   await page
-    .getByRole("button", { name: "Review revoking this sign-in" })
+    .getByRole("button", { name: "Review signing out this login" })
     .click();
-  await page.getByRole("button", { name: "Keep sign-ins unchanged" }).click();
+  await page.getByRole("button", { name: "Keep logins signed in" }).click();
   expect((await other.request.get("/api/state")).status()).toBe(200);
   await page
-    .getByRole("button", { name: "Review revoking this sign-in" })
+    .getByRole("button", { name: "Review signing out this login" })
     .click();
-  await page
-    .getByRole("button", { name: "Confirm sign-in revocation" })
-    .click();
+  await page.getByRole("button", { name: "Confirm sign-out" }).click();
   await expect(
-    page.getByRole("button", { name: "Review revoking this sign-in" }),
+    page.getByRole("button", { name: "Review signing out this login" }),
   ).toHaveCount(0);
   expect((await other.request.get("/api/state")).status()).toBe(401);
   await other

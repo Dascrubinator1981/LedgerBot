@@ -178,11 +178,11 @@ export async function ownerFeedbackFlow(
   await compare.click();
   await approve(page);
   await page.getByRole("link", { name: "Settings", exact: true }).click();
-  await page.getByLabel("Dashboard forecast horizon").selectOption("7");
+  await page.getByLabel("How far ahead to look").selectOption("7");
   await page.getByLabel("Show daily estimates and assumptions").check();
-  await page.getByRole("button", { name: "Save Forecaster display" }).click();
+  await page.getByRole("button", { name: "Save forecast settings" }).click();
   await expect(page.getByRole("status")).toContainText(
-    "Forecaster display saved",
+    "Forecast settings saved",
   );
   state = await (await page.request.get("/api/state")).json();
   const rejected = await page.request.patch("/api/state", {
@@ -229,7 +229,7 @@ export async function ownerFeedbackFlow(
   await expect(troubleshooting).toContainText("0 steps recorded");
   await page.getByRole("button", { name: "Close troubleshooting" }).click();
   await page.reload();
-  await expect(page.getByLabel("Dashboard forecast horizon")).toHaveValue("7");
+  await expect(page.getByLabel("How far ahead to look")).toHaveValue("7");
   await page.getByRole("link", { name: "Dashboard", exact: true }).click();
   await expect(page.locator("#forecast")).toContainText("$815.00");
   await expect(page.locator("#forecast")).toContainText("7 days");
@@ -248,5 +248,5 @@ export async function ownerFeedbackFlow(
   await expect(
     page.getByRole("heading", { name: "Settings", exact: true }),
   ).toBeVisible();
-  await expect(page.getByLabel("Dashboard forecast horizon")).toHaveValue("7");
+  await expect(page.getByLabel("How far ahead to look")).toHaveValue("7");
 }

@@ -29,7 +29,7 @@ See [the staged report](TODAY_UPDATE_REPORT.md) for current behavior. Financial 
 - With a fictional opening of $1,000 dated today, the cleared split purchase should leave $815. A $100 Groceries target should show $80 actuals and $20 remaining. Household/Automotive spending remains included in overall spending even without category targets.
 - A statement of $1,000 should fail reconciliation after that purchase; the message should show $815 calculated. A statement of $815 through today should prepare for independent review. Do not confirm reconciliation until you are done correcting entries in that period: confirmation locks it.
 - On Budget choose **+ Add a new category**, enter its name and target, then prepare once. Both should appear together in review and neither should exist until confirmed. Closing review keeps the staged change; use its Edit button to restore the entry fields.
-- Dashboard now includes the automatic Forecaster. Settings → Forecaster display selects horizon, accounts and displayed details. Its table includes today plus the chosen number of following days. Settings → Manage forecast bills and income plans holds recurring schedule controls. These are plans, not extra posted expenses.
+- Dashboard now includes the automatic Forecaster. Settings → Forecast settings selects horizon, accounts and displayed details. Its table includes today plus the chosen number of following days. Settings → Manage forecast bills and income plans holds recurring schedule controls. These are plans, not extra posted expenses.
 - Charts should be shorter. There should be no separate Forecaster item in the main sidebar; old direct URLs remain compatible for now.
 
 Weekly/biweekly/quarterly targets, page-wide batch review and saved-review expiry are included in this candidate. Email/text reminders remain future work. Use only invented records. Phone/Steam Deck testing against a private HTTPS beta still requires a separately approved hosted deployment.
@@ -45,3 +45,7 @@ After this update, Ledger shows account balances and Transactions first. Use Add
 ## Easier manual entry
 
 New manual entries apply to the balance when cleared, including on the starting day. Use Already included in my starting balance for history that your balance already covers. Pending / planned amounts appear on the dotted budget line. See [MANUAL_ENTRY_UPDATE_REPORT.md](MANUAL_ENTRY_UPDATE_REPORT.md). No database reset is needed.
+
+## Latest interaction fixes
+
+See [APP_REVIEW_REPORT.md](APP_REVIEW_REPORT.md) for the newest checks. Adding an inline category now selects it automatically, and an unfinished inline name survives Save for later. Cancel edit clears the unfinished marker; canceling an edit to a staged change restores that staged change. Settings has a Your time zone field with a Use this device’s time zone button; click Save preferences afterward.

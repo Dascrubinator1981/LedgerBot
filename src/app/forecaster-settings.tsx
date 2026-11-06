@@ -18,7 +18,7 @@ export function ForecasterSettings({
   const p = state.settings.forecaster || defaultForecastPreferences();
   return (
     <section id="forecaster-settings" className="card">
-      <h2>Forecaster display</h2>
+      <h2>Forecast settings</h2>
       <p>
         Choose what appears automatically on Dashboard. These filters do not
         change ledger records, budget targets or recurring plans. No accounts
@@ -45,7 +45,7 @@ export function ForecasterSettings({
         }}
       >
         <label>
-          Dashboard forecast horizon
+          How far ahead to look
           <select name="forecastHorizon" defaultValue={p.horizon}>
             {[7, 30, 60, 90].map((n) => (
               <option key={n} value={n}>
@@ -55,12 +55,12 @@ export function ForecasterSettings({
           </select>
         </label>
         <Input
-          label="Low balance warning cushion ($)"
+          label="Warn me when a balance falls below ($)"
           name="lowBalance"
           value={dollars(p.lowBalanceCents)}
         />
         <label>
-          Spending warning threshold (%)
+          Warn me when category spending reaches (%)
           <input
             name="nearBudget"
             type="number"
@@ -132,7 +132,7 @@ export function ForecasterSettings({
           />
           Show daily estimates and assumptions
         </label>
-        <button disabled={busy}>Save Forecaster display</button>
+        <button disabled={busy}>Save forecast settings</button>
       </form>
     </section>
   );

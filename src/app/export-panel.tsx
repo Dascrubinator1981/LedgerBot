@@ -38,7 +38,7 @@ export function ExportPanel({
                 checked={drafts}
                 onChange={(e) => setDrafts(e.target.checked)}
               />
-              Include financial proposals and before/after snapshots
+              Include saved reviews and their before-and-after details
             </label>
           )}
           <div className="actions">

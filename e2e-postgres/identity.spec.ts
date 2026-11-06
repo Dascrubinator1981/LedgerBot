@@ -183,7 +183,7 @@ test("email recovery changes the password and revokes the other app session", as
     .getByLabel("New password (at least 12 characters)", { exact: true })
     .fill("fabricated-new-password-456");
   await page
-    .getByRole("button", { name: "Change password and revoke sessions" })
+    .getByRole("button", { name: "Change password and sign out all logins" })
     .click();
   await expect(page.getByRole("status")).toContainText("Password updated");
   expect((await second.request.get("/api/state")).status()).toBe(401);

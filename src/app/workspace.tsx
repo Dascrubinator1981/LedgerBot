@@ -50,6 +50,7 @@ import { LabelEntry } from "./label-entry";
 import { repeatedPrefix } from "@/lib/label-suggestions";
 import { FormFeedback } from "./form-feedback";
 import { entryAmount } from "@/lib/transaction-entry";
+import { TimeZoneField } from "./time-zone-field";
 import { SessionPanel } from "./session-panel";
 import {
   Troubleshooting,
@@ -177,6 +178,10 @@ export default function Workspace() {
     navigateNow,
     onReview: (r) => setReview({ ...r, key: approvalKey(r.proposal.id) }),
     refresh,
+    onCancelEdit: () => {
+      setEdit(null);
+      setTransferEdit(null);
+    },
     onRestore: (snapshot) => {
       if (snapshot.editingId) {
         const t =
@@ -394,8 +399,18 @@ export default function Workspace() {
     const form = event.currentTarget;
     submittedForm.current = form;
     void run(async () => {
-      await pageDraft.add(build(new FormData(form)), form);
-      setEdit(null);
+      const fields = new FormData(form);
+      if (
+        Array.from(fields.keys()).some((key) =>
+          key.startsWith("newCategoryMode:"),
+        )
+      )
+        throw new Error(
+          "Finish adding the new category, or choose Keep working without adding, before preparing this entry.",
+        );
+      await pageDraft.add(build(fields), form);
+      if (form.dataset.draftForm === "transaction") setEdit(null);
+      if (form.dataset.draftForm === "transfer") setTransferEdit(null);
       setNotice(
         "Added to page review. Your balances have not changed. Review and confirm when you are ready.",
       );
@@ -777,7 +792,11 @@ export default function Workspace() {
               today={today()}
               month={chartMonth}
               onMonth={changeBudgetMonth}
-              onOpen={setTab}
+              onOpen={(next) => {
+                setTab(next);
+                if (next === "Ledger" && !pageDraft.hasChanges)
+                  openLedgerForm("transaction");
+              }}
               onSettings={() => setTab("Settings")}
               onBudget={() => {
                 setTab("Budget");
@@ -1355,9 +1374,10 @@ export default function Workspace() {
                     state={entryState}
                     edit={edit}
                     busy={busy}
-                    onCreateCategory={(name) =>
-                      void run(() => prepare({ kind: "category", name }))
-                    }
+                    onCreateCategory={(name, form) => {
+                      submittedForm.current = form || null;
+                      void run(() => prepare({ kind: "category", name }));
+                    }}
                   />
                   <OccurrenceFields
                     state={state}
@@ -1373,7 +1393,18 @@ export default function Workspace() {
                       Prepare transaction for review
                     </button>
                     {edit && (
-                      <button type="button" onClick={() => setEdit(null)}>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={(event) => {
+                          if (pageDraft.editingChange)
+                            pageDraft.cancelEditingChange();
+                          else {
+                            pageDraft.cancelForm(event.currentTarget.form);
+                            setEdit(null);
+                          }
+                        }}
+                      >
                         Cancel edit
                       </button>
                     )}
@@ -1399,7 +1430,6 @@ export default function Workspace() {
                     submit(e, (f) => {
                       const kind = transferEdit ? "editTransfer" : "transfer";
                       const editingId = transferEdit?.id;
-                      setTransferEdit(null);
                       return {
                         kind,
                         ...(editingId ? { id: editingId } : {}),
@@ -1507,7 +1537,15 @@ export default function Workspace() {
                     {transferEdit && (
                       <button
                         type="button"
-                        onClick={() => setTransferEdit(null)}
+                        disabled={busy}
+                        onClick={(event) => {
+                          if (pageDraft.editingChange)
+                            pageDraft.cancelEditingChange();
+                          else {
+                            pageDraft.cancelForm(event.currentTarget.form);
+                            setTransferEdit(null);
+                          }
+                        }}
                       >
                         Cancel pair edit
                       </button>
@@ -1928,7 +1966,7 @@ export default function Workspace() {
                     forecaster,
                   });
                   await refresh();
-                  setNotice("Forecaster display saved.");
+                  setNotice("Forecast settings saved.");
                 })
               }
             />
@@ -2037,7 +2075,7 @@ export default function Workspace() {
                   </Field>
                   <div className="actions">
                     <button disabled={busy}>
-                      Change password and revoke sessions
+                      Change password and sign out all logins
                     </button>
                   </div>
                 </form>
@@ -2065,11 +2103,7 @@ export default function Workspace() {
                 }}
               >
                 <div className="fields">
-                  <Input
-                    label="Timezone (IANA name)"
-                    name="timezone"
-                    value={state.settings.timezone || "Etc/UTC"}
-                  />
+                  <TimeZoneField value={state.settings.timezone || "Etc/UTC"} />
                   <Field label="Setup status">
                     <select name="setup" defaultValue={state.settings.setup}>
                       <option value="needs-review">Needs review</option>

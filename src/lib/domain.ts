@@ -167,6 +167,14 @@ export const singleOperationSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 export type SingleOperation = z.infer<typeof singleOperationSchema>;
+export const formValuesSchema = z
+  .array(z.tuple([z.string().max(100), z.string().max(500)]))
+  .max(300)
+  .refine(
+    (values) =>
+      values.every(([name]) => !/password|token|secret|csrf|email/i.test(name)),
+    "Credentials are not draft fields",
+  );
 export const formSnapshotSchema = z.object({
   operationIndex: z.number().int().min(0).max(49).optional(),
   editingId: z.uuid().optional(),
@@ -186,18 +194,10 @@ export const formSnapshotSchema = z.object({
     .object({
       index: z.number().int().min(0).max(49),
       operation: singleOperationSchema,
+      originalValues: formValuesSchema.optional(),
     })
     .optional(),
-  values: z
-    .array(z.tuple([z.string().max(100), z.string().max(500)]))
-    .max(300)
-    .refine(
-      (values) =>
-        values.every(
-          ([name]) => !/password|token|secret|csrf|email/i.test(name),
-        ),
-      "Credentials are not draft fields",
-    ),
+  values: formValuesSchema,
 });
 export const operationSchema = z.union([
   singleOperationSchema,

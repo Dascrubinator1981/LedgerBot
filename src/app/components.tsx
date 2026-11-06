@@ -98,7 +98,7 @@ export function SplitFields({
 }: {
   state: FinanceState;
   edit: Transaction | null;
-  onCreateCategory?: (name: string) => void;
+  onCreateCategory?: (name: string, form?: HTMLFormElement) => void;
   busy?: boolean;
 }) {
   const [count, setCount] = useState(Math.max(1, edit?.splits.length || 0));

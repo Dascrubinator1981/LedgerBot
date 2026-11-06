@@ -38,22 +38,23 @@ export function SessionPanel({
   }
   return (
     <section className="card">
-      <h2>Signed-in sessions</h2>
+      <h2>Your active logins</h2>
       <p>
-        Review LedgerBot app access. Tabs in the same browser share one sign-in.
-        Revocation blocks app access and outstanding approvals; it does not
-        delete financial records. Device names and locations are not collected
+        Review access to LedgerBot. Tabs in the same browser share one login.
+        Signing out a login also cancels its unfinished confirmations and keeps
+        your financial records. Device names and locations are not collected
         here.
       </p>
       <p>
-        If you suspect a stolen password, change it too. Revoking a sign-in does
-        not prevent someone who knows the password from signing in again.
+        If you suspect a stolen password, change it too. Signing out another
+        login does not prevent someone who knows the password from signing in
+        again.
       </p>
       <button
         disabled={busy || working}
         onClick={() => void action(async () => setData(await load()))}
       >
-        Refresh signed-in sessions
+        Refresh login list
       </button>
       {error && <p role="alert">{error}</p>}
       {data && (
@@ -77,7 +78,7 @@ export function SessionPanel({
                   disabled={busy || working}
                   onClick={() => setConfirm({ id: item.id })}
                 >
-                  Review revoking this sign-in
+                  Review signing out this login
                 </button>
               )}
             </div>
@@ -86,7 +87,7 @@ export function SessionPanel({
             disabled={busy || working}
             onClick={() => setConfirm({ others: true })}
           >
-            Review revoking all other sign-ins
+            Review signing out all other logins
           </button>
         </>
       )}
@@ -109,10 +110,10 @@ export function SessionPanel({
               })
             }
           >
-            Confirm sign-in revocation
+            Confirm sign-out
           </button>
           <button disabled={busy || working} onClick={() => setConfirm(null)}>
-            Keep sign-ins unchanged
+            Keep logins signed in
           </button>
         </div>
       )}
