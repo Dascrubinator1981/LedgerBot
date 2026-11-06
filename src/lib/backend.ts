@@ -10,11 +10,13 @@ import { withTenantDatabase } from "./postgres";
 import type { FinanceDb } from "./finance-db";
 import type { Session } from "./auth";
 import { PublicError } from "./errors";
+import { supportResponse } from "./support-response";
 export async function withFinance(
   request: NextRequest,
   write: boolean,
   work: (db: FinanceDb, user: Session) => Promise<unknown>,
 ) {
+  const trace = supportResponse();
   let finish = (response: NextResponse) => response;
   try {
     if (postgresMode()) {
@@ -25,10 +27,16 @@ export async function withFinance(
         const s = await providerSession(db, request, auth.user.id);
         if (write && request.headers.get("x-csrf-token") !== s.csrf)
           throw new PublicError("Invalid request token");
+        trace.running();
         return await work(db, s);
       });
-      return auth.finish(
-        NextResponse.json(result, { headers: { "Cache-Control": "no-store" } }),
+      trace.complete();
+      return trace.finish(
+        auth.finish(
+          NextResponse.json(result, {
+            headers: { "Cache-Control": "no-store" },
+          }),
+        ),
       );
     }
     if (process.env.NODE_ENV === "production")
@@ -37,10 +45,15 @@ export async function withFinance(
         503,
       );
     const s = write ? mutation(request) : session(request);
-    return NextResponse.json(await work(database(), s), {
-      headers: { "Cache-Control": "no-store" },
-    });
+    trace.running();
+    const result = await work(database(), s);
+    trace.complete();
+    return trace.finish(
+      NextResponse.json(result, {
+        headers: { "Cache-Control": "no-store" },
+      }),
+    );
   } catch (error) {
-    return finish(failure(error));
+    return trace.finish(finish(failure(error)), error);
   }
 }

@@ -397,7 +397,11 @@ export function usePageDraft({
   }
   const panel =
     dirty || items.length > 0 ? (
-      <section className="card page-draft" aria-label="Page changes">
+      <section
+        className="card page-draft"
+        aria-label="Page changes"
+        tabIndex={-1}
+      >
         <h2>
           Page review · {items.length} prepared change
           {items.length === 1 ? "" : "s"}
@@ -471,6 +475,7 @@ export function usePageDraft({
         <div className="actions">
           <button
             type="button"
+            data-support-action="review-page"
             disabled={busy || !items.length || dirty}
             onClick={() => void run(openReview)}
           >
@@ -582,6 +587,13 @@ function LeaveReview({
           ? `Before opening ${destination}, choose what to do.`
           : "These drafts do not update your finances."}
       </p>
+      {!saving && (dirty || !hasItems) && (
+        <p>
+          Review is not ready yet. Choose Keep editing, then use the Prepare
+          button below your entry. If a message appears, correct that field and
+          try again. You can also save the unfinished entry for later.
+        </p>
+      )}
       {saving ? (
         <form
           onSubmit={(e) => {

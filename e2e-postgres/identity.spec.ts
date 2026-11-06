@@ -66,7 +66,9 @@ async function approve(page: Page) {
     .getByRole("button", { name: "Confirm these exact changes" })
     .click();
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByRole("status")).toContainText("Change saved");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Change saved" }),
+  ).toContainText("Change saved");
 }
 test("verified identity, PostgreSQL ledger and second-user isolation work together", async ({
   page,

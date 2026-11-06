@@ -1,9 +1,18 @@
+import { readFile } from "node:fs/promises";
 import { openReview } from "./open-review";
 import { expect, type Page } from "@playwright/test";
 export async function ownerFeedbackFlow(
   page: Page,
   approve: (page: Page) => Promise<void>,
 ) {
+  await page
+    .getByRole("button", { name: "Help troubleshoot", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Troubleshooting" }),
+  ).toContainText("Recording is off");
+  await page.getByRole("button", { name: "Start fresh recording" }).click();
+  await page.getByRole("button", { name: "Close troubleshooting" }).click();
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await page
     .getByLabel("Account name", { exact: true })
@@ -84,8 +93,57 @@ export async function ownerFeedbackFlow(
   await expect(page.getByLabel("Description", { exact: true })).toHaveValue(
     "Fictional split purchase",
   );
-  await page.getByLabel("Date", { exact: true }).fill(today);
+  // Pending cannot bypass the future-date rule or silently post this purchase.
+  await page.getByLabel("Status", { exact: true }).selectOption("pending");
   await prepare.click();
+  await expect(form.getByRole("alert")).toContainText(
+    "does not allow future dates",
+  );
+  expect(
+    (await (await page.request.get("/api/state")).json()).transactions,
+  ).toHaveLength(0);
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Review is not ready yet",
+  );
+  await page.getByRole("button", { name: "Keep editing", exact: true }).click();
+  await page.getByLabel("Date", { exact: true }).fill(today);
+  await page.getByLabel("Status", { exact: true }).selectOption("cleared");
+  // A failed connection and an unreadable reply must be visible, preserve input,
+  // and leave canonical records untouched before an independent approval.
+  await page.route(
+    "**/api/draft-validation",
+    (route) => route.abort("failed"),
+    { times: 1 },
+  );
+  await prepare.click();
+  await expect(form.getByRole("alert")).toBeVisible();
+  await expect(
+    page.getByLabel("Signed amount ($)", { exact: true }),
+  ).toHaveValue("185");
+  await page.route(
+    "**/api/draft-validation",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "invalid-json",
+      }),
+    { times: 1 },
+  );
+  await prepare.click();
+  await expect(form.getByRole("alert")).toContainText(
+    "could not read the server",
+  );
+  expect(
+    (await (await page.request.get("/api/state")).json()).transactions,
+  ).toHaveLength(0);
+  await prepare.click();
+  await expect(
+    page.getByRole("region", { name: "Page changes" }),
+  ).toBeFocused();
+  await expect(page.getByRole("status")).toContainText("Added to page review");
+  await expect(form.getByRole("alert")).toHaveCount(0);
   await openReview(page);
   await expect(page.getByRole("dialog")).toContainText("$815.00");
   await approve(page);
@@ -134,6 +192,38 @@ export async function ownerFeedbackFlow(
     },
   });
   expect(rejected.status()).toBe(400);
+  await page
+    .getByRole("button", { name: "Help troubleshoot", exact: true })
+    .click();
+  const troubleshooting = page.getByRole("dialog", { name: "Troubleshooting" });
+  await expect(troubleshooting).toContainText("future-date");
+  await expect(troubleshooting).toContainText("completed");
+  await expect(troubleshooting).toContainText("network-error");
+  await expect(troubleshooting).toContainText("unreadable-response");
+  await page.evaluate(() => window.dispatchEvent(new Event("error")));
+  await expect(troubleshooting).toContainText("unexpected-error");
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download safe report" }).click();
+  const file = await downloaded;
+  const text = await readFile((await file.path())!, "utf8");
+  const report = JSON.parse(text);
+  expect(report.format).toBe("ledgerbot-support-v1");
+  expect(report.entries.length).toBeLessThanOrEqual(200);
+  expect(
+    report.entries.some((entry: { requestId?: string }) => entry.requestId),
+  ).toBe(true);
+  for (const privateText of [
+    "Fictional split purchase",
+    "Fictional owner check",
+    "Fictional owner groceries",
+    "csrf",
+    "password",
+    "cookie",
+  ])
+    expect(text).not.toContain(privateText);
+  await page.getByRole("button", { name: "Clear report" }).click();
+  await expect(troubleshooting).toContainText("0 steps recorded");
+  await page.getByRole("button", { name: "Close troubleshooting" }).click();
   await page.reload();
   await expect(page.getByLabel("Dashboard forecast horizon")).toHaveValue("7");
   await page.getByRole("link", { name: "Dashboard", exact: true }).click();

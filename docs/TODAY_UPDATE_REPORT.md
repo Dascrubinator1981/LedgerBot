@@ -2,6 +2,8 @@
 
 This is a private development candidate, not a published application or a beta approval. Use invented financial information only.
 
+Opt-in troubleshooting and later split-entry feedback, with their separately executed checks, are recorded in [SPLIT_ENTRY_FEEDBACK_REPORT.md](SPLIT_ENTRY_FEEDBACK_REPORT.md). The artifact scan below identifies the earlier staged image; it is not a scan of subsequent commits.
+
 ## What you would see today
 
 The Dashboard now opens as Forecast. Account balances and budget details sit beside smaller monthly and weekly charts, with upcoming expenses/bills below. Risk messages identify overdrafts, budget pressure and incomplete information. Bills do not trigger the discretionary-spending yellow warning. Filters cannot hide an account from the overall risk assessment. Projections remain projections based on entered information, not promises about future cash.

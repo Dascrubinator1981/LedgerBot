@@ -33,3 +33,7 @@ See [the staged report](TODAY_UPDATE_REPORT.md) for current behavior. Financial 
 - Charts should be shorter. There should be no separate Forecaster item in the main sidebar; old direct URLs remain compatible for now.
 
 Weekly/biweekly/quarterly targets, page-wide batch review and saved-review expiry are included in this candidate. Email/text reminders remain future work. Use only invented records. Phone/Steam Deck testing against a private HTTPS beta still requires a separately approved hosted deployment.
+
+## If a button still seems unresponsive
+
+After updating, use **Help troubleshoot → Start fresh recording**, close the dialog and try the action. Reopen it and choose **Download safe report** before refreshing. See [the step-by-step guide](TROUBLESHOOTING.md). Preparation now moves to the review queue with an explicit notice; your balances change only after confirmation. Tomorrow is a scheduled item, not a pending actual payment.

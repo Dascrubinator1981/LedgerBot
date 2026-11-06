@@ -27,7 +27,9 @@ async function approve(page: Page) {
     .getByRole("button", { name: "Confirm these exact changes" })
     .click();
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByRole("status")).toContainText("Change saved");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Change saved" }),
+  ).toContainText("Change saved");
 }
 test("two users, empty start, reviewed account, expense, reload, and isolation", async ({
   page,

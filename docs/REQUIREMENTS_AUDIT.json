@@ -29,6 +29,9 @@
     "Partial boundary only; live service not implemented": 1,
     "Partial across full product": 1,
     "Partial; hosted and hardware gates outstanding": 1,
+    "Implemented locally; hosted operations remain future work": 1,
+    "Planned; not implemented": 2,
+    "Partial; complete Settings pass pending": 1,
     "In progress": 1
   },
   "requirements": [
@@ -6889,6 +6892,60 @@
       "evidence": [
         "deploy/README.md",
         "docs/DEVICE_TESTING_GUIDE.md"
+      ]
+    },
+    {
+      "id": "conversation:SUPPORT",
+      "source": "Latest user conversation",
+      "line": null,
+      "section": "User requests (latest precedence)",
+      "text": "Opt-in diagnostic dialog pairs browser actions with safe financial-server responses and a downloadable report; no private values or automatic uploads.",
+      "status": "Implemented locally; hosted operations remain future work",
+      "assessment": "User request, not a command extracted from an attachment.",
+      "evidence": [
+        "src/lib/troubleshooting.ts",
+        "src/lib/support-response.ts",
+        "src/app/troubleshooting-panel.tsx",
+        "tests/troubleshooting.test.ts",
+        "docs/TROUBLESHOOTING.md"
+      ]
+    },
+    {
+      "id": "conversation:HOUSEHOLD",
+      "source": "Latest user conversation",
+      "line": null,
+      "section": "User requests (latest precedence)",
+      "text": "Separate partner logins, accepted invitations, explicitly shared/private accounts, live approved updates and attribution.",
+      "status": "Planned; not implemented",
+      "assessment": "User request, not a command extracted from an attachment.",
+      "evidence": [
+        "docs/HOUSEHOLD_APPROVAL_PLAN.md"
+      ]
+    },
+    {
+      "id": "conversation:JOINTAPPROVAL",
+      "source": "Latest user conversation",
+      "line": null,
+      "section": "User requests (latest precedence)",
+      "text": "Approval Rules list with either/both partners, configurable action/amount thresholds, same-version approvals and no AI confirmation.",
+      "status": "Planned; not implemented",
+      "assessment": "User request, not a command extracted from an attachment.",
+      "evidence": [
+        "docs/HOUSEHOLD_APPROVAL_PLAN.md"
+      ]
+    },
+    {
+      "id": "conversation:PLAINSETTINGS",
+      "source": "Latest user conversation",
+      "line": null,
+      "section": "User requests (latest precedence)",
+      "text": "Replace programmer jargon with everyday wording across settings, forms, errors and confirmation; technical detail behind More details.",
+      "status": "Partial; complete Settings pass pending",
+      "assessment": "User request, not a command extracted from an attachment.",
+      "evidence": [
+        "docs/HOUSEHOLD_APPROVAL_PLAN.md",
+        "src/app/troubleshooting-panel.tsx",
+        "docs/SPLIT_ENTRY_FEEDBACK_REPORT.md"
       ]
     },
     {

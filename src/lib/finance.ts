@@ -157,7 +157,7 @@ async function validate(db: FinanceDb, userId: string, op: SingleOperation) {
       );
     if (op.date > civilToday(s.settings.timezone))
       throw new PublicError(
-        "Use recurring plans for future dates, not actual transactions",
+        `This date is ahead of today (${civilToday(s.settings.timezone)} in ${s.settings.timezone}). Choose today or an earlier date. Pending means a payment already made that has not cleared; it does not allow future dates. For a future bill, use a bill schedule.`,
       );
     if (
       op.splits.length &&

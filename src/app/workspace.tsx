@@ -48,6 +48,13 @@ import { repeatedPrefix } from "@/lib/label-suggestions";
 import { FormFeedback } from "./form-feedback";
 import { entryAmount } from "@/lib/transaction-entry";
 import { SessionPanel } from "./session-panel";
+import {
+  Troubleshooting,
+  supportFetch,
+  type SupportEvent,
+  type SupportRoute,
+} from "@/lib/troubleshooting";
+import { TroubleshootingPanel } from "./troubleshooting-panel";
 import { ReconciliationInvestigator } from "./reconciliation-investigator";
 
 export default function Workspace() {
@@ -163,8 +170,16 @@ export default function Workspace() {
   const reviewedForm = useRef<HTMLFormElement | null>(null);
   const submittedForm = useRef<HTMLFormElement | null>(null);
   const [failedForm, setFailedForm] = useState<HTMLFormElement | null>(null);
+  const troubleshooting = useMemo(
+    () => ({ scope: csrf, log: new Troubleshooting() }),
+    [csrf],
+  ).log;
   async function api(path: string, method = "GET", payload?: unknown) {
-    const response = await fetch(`/api/${path}`, {
+    const meta = {
+      route: path as SupportRoute,
+      method: method as SupportEvent["method"],
+    };
+    const response = await supportFetch(troubleshooting, path, method, {
       method,
       headers:
         method === "GET"
@@ -172,7 +187,15 @@ export default function Workspace() {
           : { "Content-Type": "application/json", "x-csrf-token": csrf },
       body: payload === undefined ? undefined : JSON.stringify(payload),
     });
-    const result = await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      troubleshooting.record({ event: "unreadable-response", ...meta });
+      throw new Error(
+        "We could not read the server’s reply. A save may have completed. Check your records or saved receipt before trying again.",
+      );
+    }
     if (!response.ok) {
       if (response.status === 401 || result.signedOut) {
         setState(null);
@@ -341,6 +364,14 @@ export default function Workspace() {
     void run(async () => {
       await pageDraft.add(build(new FormData(form)), form);
       setEdit(null);
+      setNotice(
+        "Added to page review. Your balances have not changed. Review and confirm when you are ready.",
+      );
+      requestAnimationFrame(() => {
+        const panel = document.querySelector<HTMLElement>(".page-draft");
+        panel?.focus();
+        panel?.scrollIntoView({ block: "start", behavior: "smooth" });
+      });
     });
   }
   const str = (f: FormData, key: string) => String(f.get(key) || "");
@@ -510,7 +541,25 @@ export default function Workspace() {
 
   const currentMonth = today().slice(0, 7);
   return (
-    <div className="shell">
+    <div
+      className="shell"
+      onClickCapture={(event) => {
+        const target = event.target as HTMLElement;
+        const button = target.closest("button"),
+          link = target.closest("a");
+        if (button)
+          troubleshooting.record({
+            event: "button",
+            action: (button.getAttribute("data-support-action") ||
+              "button") as SupportEvent["action"],
+          });
+        else if (link && link.origin === location.origin)
+          troubleshooting.record({
+            event: "navigation",
+            page: sectionFromUrl(new URL(link.href)),
+          });
+      }}
+    >
       <a className="skip" href="#main-content">
         Skip to content
       </a>
@@ -560,9 +609,25 @@ export default function Workspace() {
       <main
         id="main-content"
         onInputCapture={pageDraft.mark}
+        onBlurCapture={(event) => {
+          const field = event.target;
+          if (
+            field instanceof HTMLInputElement ||
+            field instanceof HTMLSelectElement ||
+            field instanceof HTMLTextAreaElement
+          )
+            troubleshooting.record({
+              event: "field-edited",
+              field: (field.name || "other") as SupportEvent["field"],
+            });
+        }}
         onChangeCapture={pageDraft.mark}
         onInvalidCapture={(event) => {
           const input = event.target as HTMLInputElement;
+          troubleshooting.record({
+            event: "form-invalid",
+            field: input.name as SupportEvent["field"],
+          });
           if (input.form) {
             setFailedForm(input.form);
             setError(
@@ -577,6 +642,7 @@ export default function Workspace() {
             <h1>{tab === "Dashboard" ? "Forecast" : tab}</h1>
           </div>
           <div className="actions">
+            <TroubleshootingPanel key={csrf} recorder={troubleshooting} />
             <span className="pill">Manual · no live integrations</span>
             <button className="primary" onClick={() => setTab("Ledger")}>
               + Add transaction
@@ -858,6 +924,11 @@ export default function Workspace() {
                 The entry type sets its direction, including split amounts. Card
                 payments belong in Transfer. Blank splits remain uncategorized.
               </p>
+              <p>
+                Today is {currentDay} in {state.settings.timezone}. Use today or
+                an earlier date. Pending means already paid, but not yet cleared
+                by your bank.
+              </p>
               <form
                 data-financial="true"
                 data-draft-form="transaction"
@@ -955,6 +1026,7 @@ export default function Workspace() {
                 />
                 <div className="actions">
                   <button
+                    data-support-action="prepare-transaction"
                     disabled={busy || !accounts.length}
                     className="primary"
                   >

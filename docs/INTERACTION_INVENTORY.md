@@ -53,20 +53,20 @@ Regenerate with `node scripts/interaction-inventory.mjs`.
 | src/app/label-entry.tsx:27 | button | Use | Review feature-level E2E evidence; physical QA pending |
 | src/app/label-entry.tsx:31 | button | Keep my new name | Review feature-level E2E evidence; physical QA pending |
 | src/app/label-entry.tsx:66 | input |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:422 | button | Edit change | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:454 | button | Remove change | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:472 | button | Review staged changes | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:479 | button | Save changes for later review | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:482 | button | Discard page changes | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:586 | form |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:598 | select |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:609 | select | expiry | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:621 | select | reminder | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:631 | button | Save for later | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:635 | button | Review and confirm now | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:638 | button | Save changes for later review | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:641 | button | Discard changes and continue | Review feature-level E2E evidence; physical QA pending |
-| src/app/page-draft.tsx:646 | button | Keep editing | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:426 | button | Edit change | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:458 | button | Remove change | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:476 | button | Review staged changes | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:484 | button | Save changes for later review | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:487 | button | Discard page changes | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:598 | form |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:610 | select |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:621 | select | expiry | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:633 | select | reminder | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:643 | button | Save for later | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:647 | button | Review and confirm now | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:650 | button | Save changes for later review | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:653 | button | Discard changes and continue | Review feature-level E2E evidence; physical QA pending |
+| src/app/page-draft.tsx:658 | button | Keep editing | Review feature-level E2E evidence; physical QA pending |
 | src/app/planning-forms.tsx:51 | select |  | Review feature-level E2E evidence; physical QA pending |
 | src/app/planning-forms.tsx:86 | Input |  | Review feature-level E2E evidence; physical QA pending |
 | src/app/planning-forms.tsx:96 | input | This payment settles the selected occurrence in full | Review feature-level E2E evidence; physical QA pending |
@@ -123,76 +123,82 @@ Regenerate with `node scripts/interaction-inventory.mjs`.
 | src/app/setup-reminders.tsx:82 | button | Dismiss reminder | Review feature-level E2E evidence; physical QA pending |
 | src/app/setup-reminders.tsx:90 | button | : not applicable | Review feature-level E2E evidence; physical QA pending |
 | src/app/setup-reminders.tsx:104 | button | Restore reminder | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:374 | form |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:393 | input | email | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:403 | input | password | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:415 | button |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:425 | button | Back to sign in | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:428 | button |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:445 | button | Forgot your password? | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:555 | button | Sign out | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:581 | button | + Add transaction | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:584 | button | Sign out | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:605 | button | Open saved reviews | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:629 | button | Set up manually | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:635 | button | Skip setup | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:725 | form |  | Financial draft/review form; approval/auth/failure tests required |
-| src/app/workspace.tsx:743 | Input | Account name | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:745 | select | type | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:759 | Input | Opening balance ($, positive owed for liabilities) | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:765 | select | openingBasis | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:774 | Input | Opening as-of date | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:782 | button | Prepare account for review | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:797 | form |  | Financial draft/review form; approval/auth/failure tests required |
-| src/app/workspace.tsx:809 | AccountSelect | accountId | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:810 | Input | Statement ending date | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:816 | Input | Statement ending balance ($) | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:822 | button | Compare and prepare reconciliation | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:861 | form |  | Financial draft/review form; approval/auth/failure tests required |
-| src/app/workspace.tsx:901 | AccountSelect | accountId | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:906 | Input | Date | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:912 | LabelEntry | Description | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:918 | Input | Signed amount ($) | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:924 | select | status | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:934 | select | flow | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:957 | button | Prepare transaction for review | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:964 | button | Cancel edit | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:977 | form |  | Financial draft/review form; approval/auth/failure tests required |
-| src/app/workspace.tsx:1003 | AccountSelect | fromId | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1009 | AccountSelect | toId | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1015 | Input | Transfer amount ($, positive) | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1020 | Input | Transfer description | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1025 | Input | Transfer date | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1032 | select | status | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1049 | button | Cancel pair edit | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1053 | button |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1065 | select |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1078 | select |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1088 | input |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1094 | input |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1168 | button | Edit | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1181 | button | Review delete | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1254 | form |  | Financial draft/review form; approval/auth/failure tests required |
-| src/app/workspace.tsx:1261 | LabelEntry | New category name | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1268 | button | Prepare category | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1319 | select |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1429 | button | Resume saved review | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1435 | button | Discard saved review | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1472 | button | Review exact changes | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1492 | button | Discard | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1521 | button | Setup & Personalization | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1542 | button | Review restore deleted batch item | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1561 | button | Review undo deletion | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1576 | button | Check saved receipt | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1630 | input | Show in-app review reminders | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1689 | form |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1707 | input | newPassword | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1717 | button | Change password and revoke sessions | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1730 | form |  | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1746 | Input | Timezone (IANA name) | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1752 | select | setup | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1762 | input | promotions | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1771 | button | Save preferences | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1774 | button | Resume account setup | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1777 | button | Resume bills & income | Review feature-level E2E evidence; physical QA pending |
-| src/app/workspace.tsx:1780 | button | Resume budget setup | Review feature-level E2E evidence; physical QA pending |
+| src/app/troubleshooting-panel.tsx:43 | button | Help troubleshoot | Review feature-level E2E evidence; physical QA pending |
+| src/app/troubleshooting-panel.tsx:75 | button | Stop recording | Review feature-level E2E evidence; physical QA pending |
+| src/app/troubleshooting-panel.tsx:77 | button | Start fresh recording | Review feature-level E2E evidence; physical QA pending |
+| src/app/troubleshooting-panel.tsx:81 | button | Download safe report | Review feature-level E2E evidence; physical QA pending |
+| src/app/troubleshooting-panel.tsx:84 | button | Clear report | Review feature-level E2E evidence; physical QA pending |
+| src/app/troubleshooting-panel.tsx:90 | button | Close troubleshooting | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:405 | form |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:424 | input | email | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:434 | input | password | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:446 | button |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:456 | button | Back to sign in | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:459 | button |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:476 | button | Forgot your password? | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:604 | button | Sign out | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:647 | button | + Add transaction | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:650 | button | Sign out | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:671 | button | Open saved reviews | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:695 | button | Set up manually | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:701 | button | Skip setup | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:791 | form |  | Financial draft/review form; approval/auth/failure tests required |
+| src/app/workspace.tsx:809 | Input | Account name | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:811 | select | type | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:825 | Input | Opening balance ($, positive owed for liabilities) | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:831 | select | openingBasis | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:840 | Input | Opening as-of date | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:848 | button | Prepare account for review | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:863 | form |  | Financial draft/review form; approval/auth/failure tests required |
+| src/app/workspace.tsx:875 | AccountSelect | accountId | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:876 | Input | Statement ending date | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:882 | Input | Statement ending balance ($) | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:888 | button | Compare and prepare reconciliation | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:932 | form |  | Financial draft/review form; approval/auth/failure tests required |
+| src/app/workspace.tsx:972 | AccountSelect | accountId | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:977 | Input | Date | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:983 | LabelEntry | Description | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:989 | Input | Signed amount ($) | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:995 | select | status | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1005 | select | flow | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1028 | button | Prepare transaction for review | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1036 | button | Cancel edit | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1049 | form |  | Financial draft/review form; approval/auth/failure tests required |
+| src/app/workspace.tsx:1075 | AccountSelect | fromId | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1081 | AccountSelect | toId | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1087 | Input | Transfer amount ($, positive) | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1092 | Input | Transfer description | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1097 | Input | Transfer date | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1104 | select | status | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1121 | button | Cancel pair edit | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1125 | button |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1137 | select |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1150 | select |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1160 | input |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1166 | input |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1240 | button | Edit | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1253 | button | Review delete | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1326 | form |  | Financial draft/review form; approval/auth/failure tests required |
+| src/app/workspace.tsx:1333 | LabelEntry | New category name | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1340 | button | Prepare category | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1391 | select |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1501 | button | Resume saved review | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1507 | button | Discard saved review | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1544 | button | Review exact changes | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1564 | button | Discard | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1593 | button | Setup & Personalization | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1614 | button | Review restore deleted batch item | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1633 | button | Review undo deletion | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1648 | button | Check saved receipt | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1702 | input | Show in-app review reminders | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1761 | form |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1779 | input | newPassword | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1789 | button | Change password and revoke sessions | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1802 | form |  | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1818 | Input | Timezone (IANA name) | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1824 | select | setup | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1834 | input | promotions | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1843 | button | Save preferences | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1846 | button | Resume account setup | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1849 | button | Resume bills & income | Review feature-level E2E evidence; physical QA pending |
+| src/app/workspace.tsx:1852 | button | Resume budget setup | Review feature-level E2E evidence; physical QA pending |

@@ -10,7 +10,9 @@ async function approve(page: Page) {
     .getByRole("button", { name: "Confirm these exact changes" })
     .click();
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByRole("status")).toContainText("Change saved");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Change saved" }),
+  ).toContainText("Change saved");
 }
 export async function correlationFlow(page: Page) {
   const today = new Date().toISOString().slice(0, 10),
