@@ -1,3 +1,5 @@
+import { proposalText, storedProposal } from "./proposal-storage";
+import { afterOpening } from "./domain";
 import { forecastPreferencesSchema } from "./forecast-preferences";
 import { proposalDigest, verifyDigest } from "./proposal-integrity";
 import {
@@ -9,7 +11,7 @@ import {
 } from "./finance-planning";
 import { PublicError } from "./errors";
 import { randomUUID } from "node:crypto";
-import { financialImpact } from "./preview";
+import { financialImpact, financialComparison } from "./preview";
 import type { FinanceDb } from "./finance-db";
 import { hash, secret, type Session } from "./auth";
 import {
@@ -26,6 +28,7 @@ import {
   type Proposal,
   type FinanceState,
   type Operation,
+  type SingleOperation,
 } from "./domain";
 type Table =
   | "accounts"
@@ -47,7 +50,12 @@ async function records<T>(
       .all(userId)) as {
       data: string;
     }[]
-  ).map((r) => JSON.parse(r.data) as T);
+  ).map(
+    (r) =>
+      JSON.parse(
+        table === "proposals" ? proposalText(db, r.data, userId) : r.data,
+      ) as T,
+  );
 }
 async function owned<T>(
   db: FinanceDb,
@@ -63,7 +71,9 @@ async function owned<T>(
       }
     | undefined;
   if (!row) throw new PublicError("Record unavailable");
-  return JSON.parse(row.data) as T;
+  return JSON.parse(
+    table === "proposals" ? proposalText(db, row.data, userId) : row.data,
+  ) as T;
 }
 async function currentRevision(db: FinanceDb, userId: string): Promise<number> {
   const row = (await db
@@ -121,7 +131,7 @@ export async function state(
     },
   };
 }
-async function validate(db: FinanceDb, userId: string, op: Operation) {
+async function validate(db: FinanceDb, userId: string, op: SingleOperation) {
   const s = await state(db, userId, false);
   const account = async (id: string) =>
     await owned<Account>(db, "accounts", userId, id);
@@ -141,9 +151,9 @@ async function validate(db: FinanceDb, userId: string, op: Operation) {
   if (op.kind === "transaction" || op.kind === "editTransaction") {
     const a = await account(op.accountId);
     await unlockedDate(a.id, op.date);
-    if (op.date <= a.asOf)
+    if (!afterOpening(a, op.date))
       throw new PublicError(
-        "Transaction must be after the opening snapshot date. Same-day entries are already included in that end-of-day snapshot.",
+        "Transaction is included in the opening snapshot. Choose a later date, or review a correction to a starting balance before today’s entries in Accounts.",
       );
     if (op.date > civilToday(s.settings.timezone))
       throw new PublicError(
@@ -193,7 +203,7 @@ async function validate(db: FinanceDb, userId: string, op: Operation) {
       to = await account(op.toId);
     await unlockedDate(from.id, op.date);
     await unlockedDate(to.id, op.date);
-    if (op.date <= from.asOf || op.date <= to.asOf)
+    if (!afterOpening(from, op.date) || !afterOpening(to, op.date))
       throw new PublicError("Transfer must be after both opening snapshots");
     if (op.date > civilToday(s.settings.timezone))
       throw new PublicError("Future transfers are not actuals");
@@ -229,7 +239,7 @@ async function validate(db: FinanceDb, userId: string, op: Operation) {
   await validatePlanning(db, userId, op, s);
   return s;
 }
-function beforeValue(s: FinanceState, op: Operation): unknown {
+function beforeValue(s: FinanceState, op: SingleOperation): unknown {
   if (op.kind === "editTransaction" || op.kind === "deleteTransaction") {
     const t = s.transactions.find((v) => v.id === op.id)!;
     return t.transferId
@@ -257,33 +267,76 @@ export async function propose(
   db: FinanceDb,
   session: Session,
   input: unknown,
+  persist = true,
+  sourceSavedReviewId?: string,
 ): Promise<Proposal> {
-  const op = await normalizePlanning(
-    db,
-    session.userId,
-    operationSchema.parse(input),
-  );
-  const s = await validate(db, session.userId, op);
+  if (sourceSavedReviewId) {
+    const saved = await owned<Proposal>(
+      db,
+      "proposals",
+      session.userId,
+      sourceSavedReviewId,
+    );
+    verifyDigest(session.userId, saved);
+    if (saved.status !== "saved_for_later" || saved.expiresAt <= Date.now())
+      throw new PublicError("Saved review expired or already completed");
+  }
+  const parsed = operationSchema.parse(input);
+  if (parsed.kind === "draft")
+    throw new PublicError("Saved drafts need the separate resume workflow");
+  let op: Operation,
+    before: unknown,
+    impact: Proposal["impact"],
+    s: FinanceState;
+  if (parsed.kind === "batch") {
+    await db.exec("BEGIN IMMEDIATE");
+    try {
+      s = await state(db, session.userId, false);
+      const operations: SingleOperation[] = [],
+        previous: unknown[] = [];
+      for (const item of parsed.operations) {
+        const normalized = await normalizePlanning(db, session.userId, item);
+        const current = await validate(db, session.userId, normalized);
+        previous.push(beforeValue(current, normalized));
+        operations.push(normalized);
+        await apply(db, session.userId, normalized);
+      }
+      op = { kind: "batch", operations };
+      before = previous;
+      impact = financialComparison(s, await state(db, session.userId, false));
+      await db.exec("ROLLBACK");
+    } catch (error) {
+      await db.exec("ROLLBACK");
+      throw error;
+    }
+  } else {
+    op = await normalizePlanning(db, session.userId, parsed);
+    s = await validate(db, session.userId, op);
+    before = beforeValue(s, op);
+    impact = financialImpact(s, op);
+  }
   const p: Proposal = {
     id: randomUUID(),
     version: 1,
     digest: "",
     operation: op,
-    before: beforeValue(s, op),
-    impact: financialImpact(s, op),
+    before,
+    impact,
     status: "awaiting_review",
     revision: s.revision,
     createdAt: Date.now(),
     expiresAt: Date.now() + 86400000,
     source: session.principal,
+    ...(sourceSavedReviewId ? { sourceSavedReviewId } : {}),
   };
   p.digest = proposalDigest(session.userId, p);
-  await db
-    .prepare("INSERT INTO proposals VALUES(?,?,?)")
-    .run(p.id, session.userId, JSON.stringify(p));
+  if (persist)
+    await db
+      .prepare("INSERT INTO proposals VALUES(?,?,?)")
+      .run(p.id, session.userId, JSON.stringify(p));
   return p;
 }
-async function activeSession(db: FinanceDb, session: Session) {
+export async function activeSession(db: FinanceDb, session: Session) {
   const row = (await db
     .prepare(
       "SELECT user_id,principal FROM sessions WHERE hash=? AND expires>?",
@@ -316,7 +369,21 @@ export async function review(
     throw new PublicError(
       "Proposal is stale. Prepare a new proposal from current records.",
     );
-  await validate(db, session.userId, p.operation);
+  if (p.operation.kind === "draft")
+    throw new PublicError("Resume saved changes before reviewing");
+  if (p.operation.kind === "batch") {
+    await db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const operation of p.operation.operations) {
+        await validate(db, session.userId, operation);
+        await apply(db, session.userId, operation);
+      }
+      await db.exec("ROLLBACK");
+    } catch (error) {
+      await db.exec("ROLLBACK");
+      throw error;
+    }
+  } else await validate(db, session.userId, p.operation);
   const token = secret();
   await db
     .prepare("INSERT INTO challenges VALUES(?,?,?,?,?,?,?,0)")
@@ -350,7 +417,7 @@ async function insertTransaction(
       .prepare("INSERT INTO allocations VALUES(?,?,?,?)")
       .run(value.id, userId, split.categoryId, split.amount);
 }
-async function apply(db: FinanceDb, userId: string, op: Operation) {
+async function apply(db: FinanceDb, userId: string, op: SingleOperation) {
   const id = randomUUID();
   const current = await state(db, userId, false);
   if (
@@ -374,6 +441,7 @@ async function apply(db: FinanceDb, userId: string, op: Operation) {
         type: op.type,
         opening: op.opening,
         asOf: op.asOf,
+        openingBasis: op.openingBasis || "end-of-day",
         currency: "USD",
       };
       await db
@@ -384,7 +452,11 @@ async function apply(db: FinanceDb, userId: string, op: Operation) {
     case "category":
       await db
         .prepare("INSERT INTO categories VALUES(?,?,?)")
-        .run(id, userId, JSON.stringify({ id, name: op.name }));
+        .run(
+          op.id || id,
+          userId,
+          JSON.stringify({ id: op.id || id, name: op.name }),
+        );
       break;
     case "transaction":
       await insertTransaction(db, userId, {
@@ -531,7 +603,11 @@ export async function confirm(
       input.proposalId,
     );
     verifyDigest(session.userId, p);
-    if (p.operation.kind === "correctOpening") {
+    if (
+      p.operation.kind === "correctOpening" ||
+      (p.operation.kind === "batch" &&
+        p.operation.operations.some((op) => op.kind === "correctOpening"))
+    ) {
       const row = (await db
         .prepare("SELECT created_at FROM sessions WHERE hash=? AND user_id=?")
         .get(session.sessionHash, session.userId)) as
@@ -588,10 +664,45 @@ export async function confirm(
       p.status !== "awaiting_review"
     )
       throw new PublicError("Confirmation expired or already used");
+    let savedSource: Proposal | undefined;
+    if (p.sourceSavedReviewId) {
+      savedSource = await owned<Proposal>(
+        db,
+        "proposals",
+        session.userId,
+        p.sourceSavedReviewId,
+      );
+      verifyDigest(session.userId, savedSource);
+      if (
+        savedSource.status !== "saved_for_later" ||
+        savedSource.expiresAt <= Date.now()
+      )
+        throw new PublicError("Saved review expired or already completed");
+    }
     if (p.revision !== (await currentRevision(db, session.userId)))
       throw new PublicError("Proposal is stale. Review a new proposal.");
-    await validate(db, session.userId, p.operation);
-    await apply(db, session.userId, p.operation);
+    if (p.operation.kind === "draft")
+      throw new PublicError(
+        "Resume and prepare saved changes before confirmation",
+      );
+    for (const operation of p.operation.kind === "batch"
+      ? p.operation.operations
+      : [p.operation]) {
+      await validate(db, session.userId, operation);
+      await apply(db, session.userId, operation);
+    }
+    if (savedSource)
+      await db
+        .prepare("UPDATE proposals SET data=? WHERE id=? AND user_id=?")
+        .run(
+          storedProposal(
+            db,
+            { ...savedSource, status: "completed" },
+            session.userId,
+          ),
+          savedSource.id,
+          session.userId,
+        );
     const receipt = {
       id: randomUUID(),
       proposalId: p.id,
@@ -633,11 +744,15 @@ export async function discard(db: FinanceDb, session: Session, id: string) {
   try {
     await activeSession(db, session);
     const p = await owned<Proposal>(db, "proposals", session.userId, id);
-    if (p.status !== "awaiting_review")
+    if (p.status !== "awaiting_review" && p.status !== "saved_for_later")
       throw new PublicError("Only pending proposals can be discarded");
     await db
       .prepare("UPDATE proposals SET data=? WHERE id=? AND user_id=?")
-      .run(JSON.stringify({ ...p, status: "rejected" }), id, session.userId);
+      .run(
+        storedProposal(db, { ...p, status: "rejected" }, session.userId),
+        id,
+        session.userId,
+      );
     await db
       .prepare("UPDATE challenges SET used=1 WHERE proposal_id=?")
       .run(id);

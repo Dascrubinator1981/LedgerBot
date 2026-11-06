@@ -1,3 +1,4 @@
+import { openReview } from "./open-review";
 import { expect, type Page } from "@playwright/test";
 export async function ownerFeedbackFlow(
   page: Page,
@@ -36,6 +37,9 @@ export async function ownerFeedbackFlow(
     "Fictional owner automotive",
   ]) {
     await page.getByLabel("New category name", { exact: true }).fill(name);
+    await expect(
+      page.getByLabel("New category name", { exact: true }),
+    ).toHaveValue(name);
     await page
       .getByRole("button", { name: "Prepare category", exact: true })
       .click();
@@ -82,6 +86,7 @@ export async function ownerFeedbackFlow(
   );
   await page.getByLabel("Date", { exact: true }).fill(today);
   await prepare.click();
+  await openReview(page);
   await expect(page.getByRole("dialog")).toContainText("$815.00");
   await approve(page);
   let state = await (await page.request.get("/api/state")).json();
@@ -135,7 +140,11 @@ export async function ownerFeedbackFlow(
   await expect(page.locator("#forecast")).toContainText("$815.00");
   await expect(page.locator("#forecast")).toContainText("7 days");
   // Today plus seven following days; the existing engine includes its opening day.
-  await expect(page.locator("#forecast tbody tr")).toHaveCount(8);
+  await expect(
+    page
+      .getByRole("table", { name: "Daily forecast estimates", exact: true })
+      .locator("tbody tr"),
+  ).toHaveCount(8);
   expect(
     (await page.locator(".finance-chart").first().boundingBox())!.height,
   ).toBeLessThanOrEqual(240);

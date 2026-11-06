@@ -50,7 +50,13 @@ export const transactionRecordSchema = z
     reconciledAt: date.nullable(),
   })
   .passthrough();
-export const operationSchema = z.discriminatedUnion("kind", [
+export const budgetPeriodSchema = z.object({
+  cadence: z.enum(["weekly", "biweekly", "monthly", "quarterly"]),
+  anchor: date,
+  amount: minor.refine((v) => v >= 0),
+});
+export type BudgetPeriod = z.infer<typeof budgetPeriodSchema>;
+export const singleOperationSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("account"),
     name,
@@ -65,8 +71,9 @@ export const operationSchema = z.discriminatedUnion("kind", [
     ]),
     opening: minor.nullable(),
     asOf: date,
+    openingBasis: z.enum(["start-of-day", "end-of-day"]).optional(),
   }),
-  z.object({ kind: z.literal("category"), name }),
+  z.object({ kind: z.literal("category"), name, id: id.optional() }),
   z.object({ kind: z.literal("transaction"), ...transactionFields }),
   z.object({ kind: z.literal("editTransaction"), id, ...transactionFields }),
   z.object({ kind: z.literal("deleteTransaction"), id }),
@@ -84,6 +91,7 @@ export const operationSchema = z.discriminatedUnion("kind", [
     kind: z.literal("budget"),
     categoryId: id,
     newCategory: z.object({ name }).optional(),
+    period: budgetPeriodSchema.optional(),
     month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
     target: minor.refine((v) => v >= 0),
   }),
@@ -109,6 +117,7 @@ export const operationSchema = z.discriminatedUnion("kind", [
     id,
     opening: minor.nullable(),
     asOf: date,
+    openingBasis: z.enum(["start-of-day", "end-of-day"]).optional(),
   }),
   z.object({ kind: z.literal("editRecurrence"), id, ...recurrenceFields }),
   z.object({ kind: z.literal("pauseRecurrence"), id, paused: z.boolean() }),
@@ -141,7 +150,62 @@ export const operationSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("restoreTransaction"),
     sourceProposalId: id,
+    sourceOperationIndex: z.number().int().min(0).max(49).optional(),
     entries: z.array(transactionRecordSchema).max(2).optional(),
+  }),
+]);
+export type SingleOperation = z.infer<typeof singleOperationSchema>;
+export const formSnapshotSchema = z.object({
+  operationIndex: z.number().int().min(0).max(49).optional(),
+  editingId: z.uuid().optional(),
+  editingKind: z.enum(["transaction", "transfer"]).optional(),
+  section: z.enum([
+    "Dashboard",
+    "Accounts",
+    "Ledger",
+    "Budget",
+    "Forecaster",
+    "Inbox",
+    "Settings",
+  ]),
+  formIndex: z.number().int().min(0).max(100),
+  formKey: z.string().max(200).optional(),
+  replaces: z
+    .object({
+      index: z.number().int().min(0).max(49),
+      operation: singleOperationSchema,
+    })
+    .optional(),
+  values: z
+    .array(z.tuple([z.string().max(100), z.string().max(500)]))
+    .max(300)
+    .refine(
+      (values) =>
+        values.every(
+          ([name]) => !/password|token|secret|csrf|email/i.test(name),
+        ),
+      "Credentials are not draft fields",
+    ),
+});
+export const operationSchema = z.union([
+  singleOperationSchema,
+  z.object({
+    kind: z.literal("batch"),
+    operations: z.array(singleOperationSchema).min(1).max(50),
+  }),
+  z.object({
+    kind: z.literal("draft"),
+    section: z.enum([
+      "Dashboard",
+      "Accounts",
+      "Ledger",
+      "Budget",
+      "Forecaster",
+      "Inbox",
+      "Settings",
+    ]),
+    forms: z.array(formSnapshotSchema).max(50),
+    operations: z.array(singleOperationSchema).max(50),
   }),
 ]);
 export type Operation = z.infer<typeof operationSchema>;
@@ -152,6 +216,7 @@ export type Account = {
   opening: number | null;
   asOf: string;
   currency: string;
+  openingBasis?: "start-of-day" | "end-of-day";
 };
 export type Transaction = {
   flow?: "income" | "expense" | "refund";
@@ -169,6 +234,7 @@ export type Transaction = {
 export type Split = z.infer<typeof splitSchema>;
 export type Category = { id: string; name: string };
 export type Budget = {
+  period?: BudgetPeriod;
   id: string;
   categoryId: string;
   month: string;
@@ -205,6 +271,13 @@ export type Proposal = {
   expiresAt: number;
   revision: number;
   source: "human" | "ai";
+  sourceSavedReviewId?: string;
+  savedReview?: {
+    deadlineAt: number;
+    remindAt: number;
+    timezone: string;
+    choice: string;
+  };
 };
 export type FinanceState = {
   accounts: Account[];
@@ -337,6 +410,13 @@ export function money(value: number | null): string {
 export const liability = (account: Account) =>
   ["credit", "loan", "liability"].includes(account.type);
 // Ledger amounts use net-worth sign for all accounts. UI displays liabilities as positive owed.
+// Legacy accounts remain end-of-day snapshots until explicitly converted.
+export function afterOpening(account: Account, day: string): boolean {
+  return (
+    day > account.asOf ||
+    (day === account.asOf && account.openingBasis === "start-of-day")
+  );
+}
 export function balance(
   account: Account,
   transactions: Transaction[],
@@ -350,7 +430,7 @@ export function balance(
         (t) =>
           t.accountId === account.id &&
           t.status === "cleared" &&
-          t.date > account.asOf &&
+          afterOpening(account, t.date) &&
           t.date <= through,
       )
       .map((t) => t.amount),
@@ -438,6 +518,8 @@ export function forecast(
     name: string;
     amount: number;
     state: "estimated" | "pending";
+    accountId: string;
+    kind: "bill" | "expense" | "income" | "transfer";
   }[] = [];
   const cashRules = state.recurrences.filter((r) =>
     cash.some((a) => a.id === r.accountId),
@@ -510,6 +592,8 @@ export function forecast(
         name: event.rule.name,
         amount: remainder * Math.sign(event.amount),
         state: "estimated",
+        accountId: event.rule.accountId,
+        kind: event.amount < 0 ? "bill" : "income",
       });
   }
   for (const t of state.transactions.filter(
@@ -520,6 +604,14 @@ export function forecast(
       name: t.description,
       amount: t.amount,
       state: "pending",
+      accountId: t.accountId,
+      kind: t.transferId
+        ? "transfer"
+        : t.amount > 0
+          ? "income"
+          : t.occurrence
+            ? "bill"
+            : "expense",
     });
   const start = unknown
     ? null

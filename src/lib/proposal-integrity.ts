@@ -10,6 +10,8 @@ export function proposalDigest(userId: string, p: Proposal) {
       before: p.before,
       impact: p.impact,
       revision: p.revision,
+      savedReview: p.savedReview,
+      sourceSavedReviewId: p.sourceSavedReviewId,
       userId,
     }),
   );

@@ -144,6 +144,7 @@ export function PlanningPanel({
           occurrences and actual payments retain their history.
         </p>
         <form
+          data-financial="true"
           key={editing?.id || "new-rule"}
           onSubmit={(e) =>
             submit(e, (f) => {
@@ -268,6 +269,7 @@ export function PlanningPanel({
           account balance again.
         </p>
         <form
+          data-financial="true"
           onSubmit={(e) =>
             submit(e, (f) => ({
               kind: "matchOccurrence",
@@ -306,6 +308,7 @@ export function PlanningPanel({
           untracked history is not guessed.
         </p>
         <form
+          data-financial="true"
           onSubmit={(e) =>
             submit(e, (f) => ({
               kind: "occurrence",
@@ -403,6 +406,7 @@ export function AccountTools({
     <section className="card">
       <h2>Account and category corrections</h2>
       <form
+        data-financial="true"
         onSubmit={(e) =>
           submit(e, (f) => ({
             kind: "renameAccount",
@@ -424,6 +428,7 @@ export function AccountTools({
         </div>
       </form>
       <form
+        data-financial="true"
         onSubmit={(e) =>
           submit(e, (f) => ({
             kind: "correctOpening",
@@ -433,13 +438,17 @@ export function AccountTools({
                 ? null
                 : parseMoney(value(f, "opening")),
             asOf: value(f, "asOf"),
+            openingBasis: value(f, "openingBasis") as
+              "start-of-day" | "end-of-day",
           }))
         }
       >
         <p>
           Opening corrections require a sign-in from the last five minutes. They
-          cannot rewrite a reconciled account. An end-of-day snapshot already
-          includes earlier entries.
+          cannot rewrite a reconciled account. The date can be earlier than when
+          you added the account. Starting balance counts same-day entries; a
+          closing snapshot includes them already. Check the exact before/after
+          balance in review.
         </p>
         <div className="fields">
           <AccountSelect
@@ -452,6 +461,16 @@ export function AccountTools({
             name="opening"
             required={false}
           />
+          <Field label="Corrected opening balance timing">
+            <select name="openingBasis" defaultValue="end-of-day">
+              <option value="end-of-day">
+                Statement closing snapshot — includes this day
+              </option>
+              <option value="start-of-day">
+                Starting balance — before this day’s entries
+              </option>
+            </select>
+          </Field>
           <Input
             label="Replacement snapshot date"
             name="asOf"
@@ -464,6 +483,7 @@ export function AccountTools({
         </div>
       </form>
       <form
+        data-financial="true"
         onSubmit={(e) =>
           submit(e, (f) => ({
             kind: "renameCategory",

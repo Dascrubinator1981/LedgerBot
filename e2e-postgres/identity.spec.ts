@@ -1,3 +1,5 @@
+import { savedPageFlow } from "../e2e/helpers/saved-page-flow";
+import { openReview } from "../e2e/helpers/open-review";
 import { ownerFeedbackFlow } from "../e2e/helpers/owner-feedback-flow";
 import { sessionFlow } from "../e2e/helpers/session-flow";
 import { inlineCategoryFlow } from "../e2e/helpers/inline-category-flow";
@@ -52,11 +54,10 @@ async function signup(page: Page, email: string) {
   await expect(page.getByRole("status")).toContainText("Check your email");
   expect((await page.request.get("/api/state")).status()).toBe(401);
   await page.goto(await emailLink(page.request, email, "confirm"));
-  await expect(
-    page.getByRole("heading", { name: "Your financial workspace" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Forecast" })).toBeVisible();
 }
 async function approve(page: Page) {
+  await openReview(page);
   const dialog = page.getByRole("dialog");
   await dialog
     .getByRole("button", { name: "Use accessible confirmation" })
@@ -158,9 +159,7 @@ test("email recovery changes the password and revokes the other app session", as
     .getByLabel("Password (at least 12 characters)", { exact: true })
     .fill(password);
   await second.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    second.getByRole("heading", { name: "Your financial workspace" }),
-  ).toBeVisible();
+  await expect(second.getByRole("heading", { name: "Forecast" })).toBeVisible();
   await page
     .getByRole("button", { name: "Sign out", exact: true })
     .last()
@@ -189,9 +188,7 @@ test("email recovery changes the password and revokes the other app session", as
     .getByLabel("Password (at least 12 characters)", { exact: true })
     .fill("fabricated-new-password-456");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Your financial workspace" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Forecast" })).toBeVisible();
   await other.close();
 });
 
@@ -225,4 +222,11 @@ test("owner-reported split and forecast preferences work with verified PostgreSQ
 }) => {
   await signup(page, `owner-flow-${crypto.randomUUID()}@example.test`);
   await ownerFeedbackFlow(page, approve);
+});
+
+test("unfinished page saves encrypted and resumes a same-day transaction without duplication", async ({
+  page,
+}) => {
+  await signup(page, `saved-page-${crypto.randomUUID()}@example.test`);
+  await savedPageFlow(page, approve);
 });

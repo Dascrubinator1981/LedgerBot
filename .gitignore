@@ -9,3 +9,4 @@ test-results/
 tsconfig.tsbuildinfo
 coverage/
 next-env.d.ts
+*.draft-key

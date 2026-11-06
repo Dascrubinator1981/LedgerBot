@@ -4,6 +4,7 @@ This file governs any coding agent in this repo, including Codex.
 
 - Read `docs/LedgerBot_Codex_Master_Build_Prompt_v3.md` for the complete product contract. Sections 20–28 are the newest agreed product decisions and supersede older sections on conflicts.
 - Read `docs/UX_REVIEW_AND_NEXT_STAGES.md` for the November 6 user-tested follow-up decisions, including Dashboard Forecaster and proposed saved-review behavior. It distinguishes implemented work from future stages; do not claim planned reminders or deferred approvals are live.
+- Consult `docs/TODAY_UPDATE_REPORT.md` and `docs/REQUIREMENTS_AUDIT.md` for current implemented behavior and remaining gates; older reports are dated checkpoints.
 - Build and validate vertical slices, not UI mockups with fake buttons. A feature is complete only when the user flow, persistent database, backend authorization, happy path and negative tests function.
 - This repository must contain **no real user financial data**, original/personal workbook, secrets, account IDs, access tokens, private receipts or raw recordings. Use wholly fabricated fixtures and synthetic demo opt-in only.
 - All new users start with no financial records. Unknown/unconfigured is different from a confirmed zero. Never preload or silently use demo data for a new account.

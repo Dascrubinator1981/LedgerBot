@@ -639,3 +639,191 @@ it("rolls back the new category if saving its paired budget fails", async () => 
   expect((await state(db, alice.userId)).categories).toEqual([]);
   expect((await state(db, alice.userId)).budgets).toEqual([]);
 });
+
+it("counts same-day cleared purchases from an explicit starting balance without changing legacy snapshots", async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  await post({
+    kind: "account",
+    name: "Same-day pocket",
+    type: "checking",
+    opening: 100000,
+    asOf: today,
+    openingBasis: "start-of-day",
+  });
+  let s = await state(db, alice.userId);
+  const a = s.accounts[0];
+  await post({
+    kind: "transaction",
+    accountId: a.id,
+    date: today,
+    description: "Same-day purchase",
+    amount: -18500,
+    status: "cleared",
+    splits: [],
+  });
+  s = await state(db, alice.userId);
+  expect(balance(s.accounts[0], s.transactions)).toBe(81500);
+  expect(forecast(s, today).opening).toBe(81500);
+  await post({
+    kind: "transaction",
+    accountId: a.id,
+    date: today,
+    description: "Pending item",
+    amount: -1000,
+    status: "pending",
+    splits: [],
+  });
+  s = await state(db, alice.userId);
+  expect(balance(a, s.transactions)).toBe(81500);
+  const legacy = { ...a, openingBasis: undefined };
+  expect(balance(legacy, s.transactions)).toBe(100000);
+});
+it("requires review to convert a legacy snapshot and preserves its basis for corrections that omit it", async () => {
+  await account("Legacy", 100000);
+  let s = await state(db, alice.userId);
+  const a = s.accounts[0];
+  const p = await propose(db, alice, {
+    kind: "correctOpening",
+    id: a.id,
+    opening: 100000,
+    asOf: "2026-01-01",
+    openingBasis: "start-of-day",
+  });
+  expect((await state(db, alice.userId)).accounts[0].openingBasis).toBe(
+    "end-of-day",
+  );
+  const r = await review(db, alice, p.id);
+  await confirm(db, alice, {
+    proposalId: p.id,
+    version: p.version,
+    digest: p.digest,
+    token: r.token,
+    idempotencyKey: randomUUID(),
+  });
+  await post({
+    kind: "transaction",
+    accountId: a.id,
+    date: "2026-01-01",
+    description: "Opening day",
+    amount: -100,
+    status: "cleared",
+    splits: [],
+  });
+  await post({
+    kind: "correctOpening",
+    id: a.id,
+    opening: 100000,
+    asOf: "2025-12-31",
+  });
+  s = await state(db, alice.userId);
+  expect(s.accounts[0].openingBasis).toBe("start-of-day");
+  expect(balance(s.accounts[0], s.transactions)).toBe(99900);
+});
+
+it("previews a batch without posting and commits its changes atomically once", async () => {
+  const operations: Operation = {
+    kind: "batch",
+    operations: [
+      { kind: "category", name: "Batch one" },
+      { kind: "category", name: "Batch two" },
+    ],
+  };
+  const preview = await propose(db, alice, operations, false);
+  expect((await state(db, alice.userId)).categories).toEqual([]);
+  expect((await state(db, alice.userId)).proposals).toEqual([]);
+  const p = await propose(db, alice, preview.operation);
+  const r = await review(db, alice, p.id);
+  const input = {
+    proposalId: p.id,
+    version: p.version,
+    digest: p.digest,
+    token: r.token,
+    idempotencyKey: randomUUID(),
+  };
+  await confirm(db, alice, input);
+  await confirm(db, alice, input);
+  expect((await state(db, alice.userId)).categories).toHaveLength(2);
+});
+it("rejects a failing later batch operation without posting earlier changes", async () => {
+  const categoryId = randomUUID();
+  await expect(
+    propose(db, alice, {
+      kind: "batch",
+      operations: [
+        { kind: "category", id: categoryId, name: "Never saved" },
+        {
+          kind: "budget",
+          categoryId: randomUUID(),
+          month: "2026-11",
+          target: 100,
+        },
+      ],
+    }),
+  ).rejects.toThrow();
+  expect((await state(db, alice.userId)).categories).toEqual([]);
+});
+
+it("rolls back an entire confirmed batch if a later write fails", async () => {
+  const p = await propose(db, alice, {
+    kind: "batch",
+    operations: [
+      { kind: "category", name: "First atomic" },
+      { kind: "category", name: "Second atomic" },
+    ],
+  });
+  const r = await review(db, alice, p.id);
+  db.exec(
+    "CREATE TRIGGER reject_second_category BEFORE INSERT ON categories WHEN json_extract(NEW.data,'$.name')='Second atomic' BEGIN SELECT RAISE(ABORT,'synthetic second-write failure'); END",
+  );
+  await expect(
+    confirm(db, alice, {
+      proposalId: p.id,
+      version: p.version,
+      digest: p.digest,
+      token: r.token,
+      idempotencyKey: randomUUID(),
+    }),
+  ).rejects.toThrow();
+  const s = await state(db, alice.userId);
+  expect(s.categories).toEqual([]);
+  expect(s.revision).toBe(0);
+});
+
+it("restores only the selected deletion from an approved batch", async () => {
+  const a = await account("Batch restore", 10000);
+  let s = await state(db, alice.userId);
+  const accountId = typeof a === "string" ? a : s.accounts[0].id;
+  for (const amount of [-1000, -2000])
+    await post({
+      kind: "transaction",
+      accountId,
+      date: "2026-01-02",
+      description: "Synthetic deletion",
+      amount,
+      status: "cleared",
+      splits: [],
+    });
+  s = await state(db, alice.userId);
+  const p = await propose(db, alice, {
+    kind: "batch",
+    operations: s.transactions.map((t) => ({
+      kind: "deleteTransaction",
+      id: t.id,
+    })),
+  });
+  const r = await review(db, alice, p.id);
+  await confirm(db, alice, {
+    proposalId: p.id,
+    version: p.version,
+    digest: p.digest,
+    token: r.token,
+    idempotencyKey: randomUUID(),
+  });
+  expect((await state(db, alice.userId)).transactions).toEqual([]);
+  await post({
+    kind: "restoreTransaction",
+    sourceProposalId: p.id,
+    sourceOperationIndex: 0,
+  });
+  expect((await state(db, alice.userId)).transactions).toHaveLength(1);
+});

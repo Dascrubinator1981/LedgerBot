@@ -53,6 +53,14 @@ export function Input({
         type={type}
         defaultValue={value}
         required={required}
+        autoComplete={
+          /\$|amount|balance|target/i.test(label) ? "off" : undefined
+        }
+        inputMode={
+          type === "text" && /\$|amount|balance|target/i.test(label)
+            ? "decimal"
+            : undefined
+        }
         maxLength={type === "text" ? 100 : undefined}
       />
     </Field>
@@ -247,6 +255,23 @@ export function Review({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  const operations =
+    data.proposal.operation.kind === "batch"
+      ? data.proposal.operation.operations
+      : [data.proposal.operation];
+  const displayState = {
+    ...state,
+    categories: [
+      ...state.categories,
+      ...operations.flatMap((op) =>
+        op.kind === "category" && op.id
+          ? [{ id: op.id, name: op.name }]
+          : op.kind === "budget" && op.newCategory
+            ? [{ id: op.categoryId, name: op.newCategory.name }]
+            : [],
+      ),
+    ],
+  };
   const dialog = useRef<HTMLDialogElement>(null),
     track = useRef<HTMLDivElement>(null);
   const drag = useRef<{ pointer: number; start: number; width: number } | null>(
@@ -290,11 +315,11 @@ export function Review({
       <div className="diff">
         <section>
           <h3>Before</h3>
-          <Diff value={data.proposal.before} state={state} />
+          <Diff value={data.proposal.before} state={displayState} />
         </section>
         <section>
           <h3>After / intended operation</h3>
-          <Diff value={data.proposal.operation} state={state} />
+          <Diff value={data.proposal.operation} state={displayState} />
         </section>
       </div>
       {data.proposal.impact && (
@@ -466,7 +491,7 @@ export function Review({
       )}
       <div className="actions">
         <button disabled={busy} onClick={onClose}>
-          Cancel / save for later
+          Cancel review / keep page draft
         </button>
       </div>
       <p>

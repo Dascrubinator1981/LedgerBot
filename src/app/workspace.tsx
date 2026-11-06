@@ -15,7 +15,6 @@ import {
   forecast,
   liability,
   money,
-  netWorth,
   parseMoney,
   type FinanceState,
   type Operation,
@@ -23,7 +22,7 @@ import {
   type Transaction,
 } from "@/lib/domain";
 
-import { BudgetCharts, RecentBills, ForecastChart } from "./finance-views";
+import { RecentBills, ForecastChart } from "./finance-views";
 import { ExportPanel } from "./export-panel";
 import {
   PlanningPanel,
@@ -43,6 +42,9 @@ import { BudgetExplorer } from "./budget-explorer";
 import { BudgetTargetForm } from "./budget-target-form";
 import { DashboardForecast } from "./dashboard-forecast";
 import { ForecasterSettings } from "./forecaster-settings";
+import { usePageDraft } from "./page-draft";
+import { LabelEntry } from "./label-entry";
+import { repeatedPrefix } from "@/lib/label-suggestions";
 import { FormFeedback } from "./form-feedback";
 import { entryAmount } from "@/lib/transaction-entry";
 import { SessionPanel } from "./session-panel";
@@ -72,6 +74,11 @@ export default function Workspace() {
   const [allowSignup, setAllowSignup] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [budgetMonth, setBudgetMonth] = useState("");
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setClockNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
   const [transferEdit, setTransferEdit] = useState<Transaction | null>(null);
   const currentDay = civilToday(state?.settings.timezone);
   const today = () => currentDay;
@@ -84,10 +91,7 @@ export default function Workspace() {
         : [],
     [state],
   );
-  const projected = useMemo(
-    () => (state ? forecast(state, currentDay, horizon) : null),
-    [state, currentDay, horizon],
-  );
+  const projected = state ? forecast(state, currentDay, horizon) : null;
   const runningValues = useMemo(
     () =>
       new Map(
@@ -101,10 +105,60 @@ export default function Workspace() {
   );
   const updates = useRef<BroadcastChannel | null>(null);
   const requestSequence = useRef(0);
-  function setTab(next: Tab) {
+  function navigateNow(next: Tab | "SignOut") {
+    if (next === "SignOut") {
+      void api("auth", "DELETE", {})
+        .then(() => {
+          setState(null);
+          setCsrf("");
+        })
+        .catch((error) =>
+          setError(
+            error instanceof Error ? error.message : "Could not sign out",
+          ),
+        );
+      return;
+    }
+    setEdit(null);
+    setTransferEdit(null);
     updateTab(next);
     history.pushState(null, "", sectionHref(next));
   }
+  function setTab(next: Tab) {
+    pageDraft.navigate(next);
+  }
+  const routeGuard = useRef<((next: Tab) => boolean) | null>(null);
+  const pageDraft = usePageDraft({
+    tab,
+    identity: csrf,
+    busy,
+    state,
+    api,
+    run,
+    navigateNow,
+    onReview: (r) => setReview({ ...r, key: approvalKey(r.proposal.id) }),
+    refresh,
+    onRestore: (snapshot) => {
+      if (snapshot.editingId) {
+        const t =
+          state?.transactions.find((t) => t.id === snapshot.editingId) || null;
+        if (snapshot.editingKind === "transfer") setTransferEdit(t);
+        else setEdit(t);
+      }
+    },
+  });
+  const pendingPageChanges = pageDraft.hasChanges,
+    requestPageNavigation = pageDraft.navigate;
+  useEffect(() => {
+    routeGuard.current = (next) => {
+      if (pendingPageChanges) {
+        history.replaceState(null, "", sectionHref(tab));
+        requestPageNavigation(next);
+        return true;
+      }
+      return false;
+    };
+  }, [pendingPageChanges, requestPageNavigation, tab]);
   const guard = useRef(false);
   const reviewedForm = useRef<HTMLFormElement | null>(null);
   const submittedForm = useRef<HTMLFormElement | null>(null);
@@ -129,7 +183,7 @@ export default function Workspace() {
       }
       throw new Error(result.error || result.message || "Request failed");
     }
-    if (method !== "GET" && path !== "review")
+    if (method !== "GET" && path !== "review" && path !== "draft-validation")
       updates.current?.postMessage("invalidate");
     return result;
   }
@@ -142,7 +196,9 @@ export default function Workspace() {
   }
   useEffect(() => {
     const navigate = () => {
-      updateTab(sectionFromUrl(new URL(location.href)));
+      const next = sectionFromUrl(new URL(location.href));
+      if (routeGuard.current?.(next)) return;
+      updateTab(next);
       {
         const month = new URL(location.href).searchParams.get("month");
         if (month && /^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(month))
@@ -228,8 +284,12 @@ export default function Workspace() {
           }
           if (
             new URLSearchParams(window.location.search).get("recovery") === "1"
-          )
-            setTab("Settings");
+          ) {
+            const recoveryUrl = new URL(location.href);
+            recoveryUrl.searchParams.set("section", "settings");
+            history.replaceState(null, "", recoveryUrl);
+            updateTab("Settings");
+          }
         } else if (r.status !== 401)
           setError("Could not load your records. Try reloading.");
       })
@@ -257,10 +317,7 @@ export default function Workspace() {
     }
   }
   async function prepare(operation: Operation) {
-    const proposal = await api("proposals", "POST", operation);
-    await refresh();
-    const r = await api("review", "POST", { id: proposal.id });
-    setReview({ ...r, key: approvalKey(proposal.id) });
+    await pageDraft.add(operation);
   }
   function changeBudgetMonth(month: string) {
     setBudgetMonth(month);
@@ -282,8 +339,8 @@ export default function Workspace() {
     const form = event.currentTarget;
     submittedForm.current = form;
     void run(async () => {
-      await prepare(build(new FormData(form)));
-      reviewedForm.current = form;
+      await pageDraft.add(build(new FormData(form)), form);
+      setEdit(null);
     });
   }
   const str = (f: FormData, key: string) => String(f.get(key) || "");
@@ -413,7 +470,34 @@ export default function Workspace() {
       </main>
     );
   const pending = state.proposals.filter((p) => p.status === "awaiting_review");
+  const savedActive = state.proposals.filter(
+    (p) => p.status === "saved_for_later" && p.expiresAt > clockNow,
+  );
+  const dueSaved =
+    state.settings.reminders?.reviews?.status === "dismissed"
+      ? []
+      : savedActive.filter(
+          (p) => p.savedReview && p.savedReview.remindAt <= clockNow,
+        );
   const accounts = state.accounts;
+  const entryState = {
+    ...state,
+    categories: [
+      ...state.categories,
+      ...pageDraft.items.flatMap((item) =>
+        item.operation.kind === "category" && item.operation.id
+          ? [{ id: item.operation.id, name: item.operation.name }]
+          : item.operation.kind === "budget" && item.operation.newCategory
+            ? [
+                {
+                  id: item.operation.categoryId,
+                  name: item.operation.newCategory.name,
+                },
+              ]
+            : [],
+      ),
+    ],
+  };
   const transactions = sortedTransactions;
   const projections = projected!;
   const chartMonth = budgetMonth || today().slice(0, 7);
@@ -452,11 +536,12 @@ export default function Workspace() {
                     return;
                   event.preventDefault();
                   setTab(t);
-                  setEdit(null);
                 }}
               >
                 {t}
-                {t === "Inbox" && pending.length ? ` (${pending.length})` : ""}
+                {t === "Inbox" && pending.length + savedActive.length
+                  ? ` (${pending.length + savedActive.length})`
+                  : ""}
               </a>
             ))}
         </nav>
@@ -467,21 +552,15 @@ export default function Workspace() {
           <br />
           Live integrations disabled
           <br />
-          <button
-            onClick={() =>
-              void run(async () => {
-                await api("auth", "DELETE", {});
-                setState(null);
-                setCsrf("");
-              })
-            }
-          >
+          <button onClick={() => pageDraft.navigate("SignOut")}>
             Sign out
           </button>
         </footer>
       </aside>
       <main
         id="main-content"
+        onInputCapture={pageDraft.mark}
+        onChangeCapture={pageDraft.mark}
         onInvalidCapture={(event) => {
           const input = event.target as HTMLInputElement;
           if (input.form) {
@@ -495,22 +574,14 @@ export default function Workspace() {
         <div className="topline">
           <div>
             <p className="eyebrow">Ledger · Plan · Possibility</p>
-            <h1>{tab === "Dashboard" ? "Your financial workspace" : tab}</h1>
+            <h1>{tab === "Dashboard" ? "Forecast" : tab}</h1>
           </div>
           <div className="actions">
             <span className="pill">Manual · no live integrations</span>
             <button className="primary" onClick={() => setTab("Ledger")}>
               + Add transaction
             </button>
-            <button
-              onClick={() =>
-                void run(async () => {
-                  await api("auth", "DELETE", {});
-                  setState(null);
-                  setCsrf("");
-                })
-              }
-            >
+            <button onClick={() => pageDraft.navigate("SignOut")}>
               Sign out
             </button>
           </div>
@@ -527,6 +598,15 @@ export default function Workspace() {
             </p>
           )}
         </div>
+        {!!dueSaved.length && (
+          <p className="notice" role="status">
+            You have {dueSaved.length} saved review
+            {dueSaved.length === 1 ? "" : "s"} approaching its deadline.{" "}
+            <button onClick={() => setTab("Inbox")}>Open saved reviews</button>
+          </p>
+        )}
+        {pageDraft.panel}
+        {pageDraft.dialog}
         <FormFeedback form={failedForm} message={error} />
         {error && !failedForm?.isConnected && (
           <p className="notice error" role="alert">
@@ -576,61 +656,15 @@ export default function Workspace() {
                   </small>
                 </p>
               </div>
-            ) : (
-              <div className="grid">
-                <div className="card">
-                  <p className="muted">Net worth · cleared actuals</p>
-                  <div className="amount">
-                    {money(netWorth(accounts, transactions))}
-                  </div>
-                  <small>Assets minus amounts owed</small>
-                </div>
-                <div className="card">
-                  <p className="muted">Cash at opening of forecast</p>
-                  <div className="amount">{money(projections.opening)}</div>
-                  <small>Checking, savings and cash · dated snapshots</small>
-                </div>
-                <div className="card">
-                  <p className="muted">Pending reviews</p>
-                  <div className="amount">{pending.length}</div>
-                  <button onClick={() => setTab("Inbox")}>
-                    Review changes
-                  </button>
-                </div>
-              </div>
-            )}
-            <div className="grid">
-              <section className="card">
-                <h2>Ledger records reality</h2>
-                <p>
-                  Every balance comes from a dated opening snapshot and cleared
-                  entries after it. Pending entries remain separate.
-                </p>
-                <button onClick={() => setTab("Ledger")}>Open ledger</button>
-              </section>
-              <section className="card">
-                <h2>Budget creates the plan</h2>
-                <p>
-                  Set custom monthly targets. Category allocations compare
-                  actual spending without changing your balances.
-                </p>
-                <button onClick={() => setTab("Budget")}>Build a plan</button>
-              </section>
-              <section className="card">
-                <h2>Forecaster looks ahead</h2>
-                <p>
-                  Explore estimated cash from your accounts, pending entries,
-                  and approved recurring assumptions.
-                </p>
-                <a href="#forecast">See automatic forecast below</a>
-              </section>
-            </div>
-            <BudgetCharts
+            ) : null}
+            <DashboardForecast
               state={state}
-              month={chartMonth}
               today={today()}
+              month={chartMonth}
               onMonth={changeBudgetMonth}
-              onOpen={() => {
+              onOpen={setTab}
+              onSettings={() => setTab("Settings")}
+              onBudget={() => {
                 setTab("Budget");
                 history.replaceState(
                   null,
@@ -638,11 +672,6 @@ export default function Workspace() {
                   `/?section=budget&month=${chartMonth}`,
                 );
               }}
-            />
-            <DashboardForecast
-              state={state}
-              today={today()}
-              onSettings={() => setTab("Settings")}
             />
             <section className="card">
               <h2>Pip’s notes</h2>
@@ -675,7 +704,10 @@ export default function Workspace() {
                       {liability(a) ? "Amount owed" : "Cleared balance"} ·
                       opening snapshot {a.asOf}
                       <br />
-                      Opening: {money(a.opening)}
+                      Opening: {money(a.opening)} ·{" "}
+                      {a.openingBasis === "start-of-day"
+                        ? "before this day’s entries"
+                        : "end-of-day snapshot"}
                     </small>
                   </p>
                 </div>
@@ -684,11 +716,14 @@ export default function Workspace() {
             <section className="card">
               <h2>Add a manual account</h2>
               <p>
-                Enter an end-of-day opening snapshot. Transactions on or before
-                that date are already included; only later dates change the
-                balance. Leave opening balance blank if unknown.
+                Enter your balance before the transactions you will record.
+                Starting balance includes same-day entries as you add them.
+                Choose a statement closing snapshot only when that day’s
+                purchases are already included. Leave the amount blank if
+                unknown.
               </p>
               <form
+                data-financial="true"
                 onSubmit={(e) =>
                   submit(e, (f) => ({
                     kind: "account",
@@ -699,6 +734,8 @@ export default function Workspace() {
                         ? null
                         : parseMoney(str(f, "opening")),
                     asOf: str(f, "asOf"),
+                    openingBasis: str(f, "openingBasis") as
+                      "start-of-day" | "end-of-day",
                   }))
                 }
               >
@@ -724,6 +761,16 @@ export default function Workspace() {
                     name="opening"
                     required={false}
                   />
+                  <Field label="Opening balance timing">
+                    <select name="openingBasis" defaultValue="start-of-day">
+                      <option value="start-of-day">
+                        Starting balance — before this day’s entries
+                      </option>
+                      <option value="end-of-day">
+                        Statement closing balance — includes this day
+                      </option>
+                    </select>
+                  </Field>
                   <Input
                     label="Opening as-of date"
                     name="asOf"
@@ -748,6 +795,7 @@ export default function Workspace() {
                 existing accounts and categories” below.
               </p>
               <form
+                data-financial="true"
                 onSubmit={(e) =>
                   submit(e, (f) => ({
                     kind: "reconcile",
@@ -782,9 +830,9 @@ export default function Workspace() {
               state={state}
               today={today()}
             />
-            <details>
+            <details open>
               <summary>
-                Rename or correct existing accounts and categories
+                Edit starting balance, date, account or category name
               </summary>
               <AccountTools
                 state={state}
@@ -811,7 +859,11 @@ export default function Workspace() {
                 payments belong in Transfer. Blank splits remain uncategorized.
               </p>
               <form
+                data-financial="true"
+                data-draft-form="transaction"
                 key={edit?.id || "new"}
+                data-editing-id={edit?.id}
+                data-editing-kind="transaction"
                 onSubmit={(e) =>
                   submit(e, (f) => {
                     const flow = str(f, "flow");
@@ -857,10 +909,11 @@ export default function Workspace() {
                     type="date"
                     value={edit?.date || today()}
                   />
-                  <Input
+                  <LabelEntry
                     label="Description"
                     name="description"
                     value={edit?.description}
+                    existing={state.transactions.map((t) => t.description)}
                   />
                   <Input
                     label="Signed amount ($)"
@@ -888,7 +941,7 @@ export default function Workspace() {
                   </select>
                 </Field>
                 <SplitFields
-                  state={state}
+                  state={entryState}
                   edit={edit}
                   busy={busy}
                   onCreateCategory={(name) =>
@@ -922,7 +975,11 @@ export default function Workspace() {
                 creates no new income or spending.
               </p>
               <form
+                data-financial="true"
+                data-draft-form="transfer"
                 key={transferEdit?.transferId || "new-transfer"}
+                data-editing-id={transferEdit?.id}
+                data-editing-kind="transfer"
                 onSubmit={(e) =>
                   submit(e, (f) => {
                     const kind = transferEdit ? "editTransfer" : "transfer";
@@ -1158,7 +1215,7 @@ export default function Workspace() {
         {tab === "Budget" && (
           <>
             <BudgetTargetForm
-              state={state}
+              state={entryState}
               month={currentMonth}
               busy={busy}
               submit={submit}
@@ -1175,6 +1232,18 @@ export default function Workspace() {
                 Custom labels describe allocations; they never post another
                 debit.
               </p>
+              {repeatedPrefix(state.categories.map((c) => c.name)).length >
+                0 && (
+                <p className="notice">
+                  Pip suggestion:{" "}
+                  {repeatedPrefix(state.categories.map((c) => c.name)).join(
+                    ", ",
+                  )}{" "}
+                  share a prefix. Consider distinct purpose names such as Food,
+                  Household and Clothing if that fits your plan. Your names
+                  remain your choice; nothing is renamed automatically.
+                </p>
+              )}
               <div className="row">
                 {state.categories.map((c) => (
                   <span className="pill" key={c.id}>
@@ -1183,12 +1252,17 @@ export default function Workspace() {
                 ))}
               </div>
               <form
+                data-financial="true"
                 onSubmit={(e) =>
                   submit(e, (f) => ({ kind: "category", name: str(f, "name") }))
                 }
               >
                 <div className="fields">
-                  <Input label="New category name" name="name" />
+                  <LabelEntry
+                    label="New category name"
+                    name="name"
+                    existing={state.categories.map((c) => c.name)}
+                  />
                 </div>
                 <div className="actions">
                   <button disabled={busy}>Prepare category</button>
@@ -1217,6 +1291,13 @@ export default function Workspace() {
                       </h2>
                       <span className="pill">{b.month} · PLAN</span>
                       <p>Target: {money(b.target)}</p>
+                      {b.period && (
+                        <p>
+                          {money(b.period.amount)} {b.period.cadence} · anchored{" "}
+                          {b.period.anchor}. Monthly target counts actual
+                          allocation dates.
+                        </p>
+                      )}
                       <p>Cleared actuals: {money(actual)}</p>
                       <p>
                         Remaining against target: {money(b.target - actual)}
@@ -1304,6 +1385,67 @@ export default function Workspace() {
         {tab === "Inbox" && (
           <>
             <section className="card">
+              <h2>Saved for review</h2>
+              <p>
+                Saved drafts are encrypted, do not change finances, and require
+                a fresh review when resumed. Expired drafts leave the active
+                queue and remain in private history; they never post
+                automatically.
+              </p>
+              {state.proposals
+                .filter(
+                  (p) =>
+                    p.status === "saved_for_later" && p.expiresAt > clockNow,
+                )
+                .map((p) => (
+                  <article className="card" key={p.id}>
+                    <h3>
+                      {p.operation.kind === "draft"
+                        ? p.operation.section
+                        : "Saved changes"}
+                    </h3>
+                    <p>
+                      Please review by{" "}
+                      {new Date(
+                        p.savedReview?.deadlineAt || p.expiresAt,
+                      ).toLocaleString(undefined, {
+                        timeZone:
+                          p.savedReview?.timezone || state.settings.timezone,
+                      })}{" "}
+                      · {p.savedReview?.timezone}
+                    </p>
+                    {p.revision !== state.revision && (
+                      <p>
+                        Records have changed since saving. Resume and compare a
+                        fresh review before confirming.
+                      </p>
+                    )}
+                    {p.savedReview && clockNow >= p.savedReview.remindAt && (
+                      <strong>
+                        Reminder: this draft is approaching its review deadline.
+                      </strong>
+                    )}
+                    <div className="actions">
+                      <button
+                        disabled={busy}
+                        onClick={() => pageDraft.resume(p)}
+                      >
+                        Resume saved review
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await api("proposals", "DELETE", { id: p.id });
+                            await refresh();
+                          })
+                        }
+                      >
+                        Discard saved review
+                      </button>
+                    </div>
+                  </article>
+                ))}
               <h2>Pending reviews</h2>
               <p>
                 Nothing in this queue changes actuals until you approve its
@@ -1394,6 +1536,27 @@ export default function Workspace() {
                   <p key={p.id}>
                     {p.operation.kind} · {p.status} · {p.id}
                     {p.status === "approved" &&
+                      p.operation.kind === "batch" &&
+                      p.operation.operations.map((op, index) =>
+                        op.kind === "deleteTransaction" ? (
+                          <button
+                            key={index}
+                            disabled={busy}
+                            onClick={() =>
+                              void run(() =>
+                                prepare({
+                                  kind: "restoreTransaction",
+                                  sourceProposalId: p.id,
+                                  sourceOperationIndex: index,
+                                }),
+                              )
+                            }
+                          >
+                            Review restore deleted batch item {index + 1}
+                          </button>
+                        ) : null,
+                      )}
+                    {p.status === "approved" &&
                       p.operation.kind === "deleteTransaction" && (
                         <button
                           disabled={busy}
@@ -1457,6 +1620,35 @@ export default function Workspace() {
                 prepare={(op) => void run(() => prepare(op))}
               />
             </details>
+            <section className="card">
+              <h2>Saved-review reminders</h2>
+              <p>
+                In-app reminders and Inbox badges are available. Email and text
+                delivery are not configured.
+              </p>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={
+                    state.settings.reminders?.reviews?.status !== "dismissed"
+                  }
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    void run(async () => {
+                      await api("state", "PATCH", {
+                        ...state.settings,
+                        reminders: {
+                          ...state.settings.reminders,
+                          reviews: { status: enabled ? "active" : "dismissed" },
+                        },
+                      });
+                      await refresh();
+                    });
+                  }}
+                />
+                Show in-app review reminders
+              </label>
+            </section>
             <SessionPanel
               busy={busy}
               load={() => api("sessions")}
@@ -1627,11 +1819,14 @@ export default function Workspace() {
             state={state}
             busy={busy}
             error={error}
-            onClose={() => {
-              reviewedForm.current = null;
-              setReview(null);
-              setNotice("Draft kept in Inbox. No financial change saved.");
-            }}
+            onClose={() =>
+              void run(async () => {
+                await pageDraft.cancelReview();
+                reviewedForm.current = null;
+                setReview(null);
+                setNotice("Review closed. Nothing applied.");
+              })
+            }
             onConfirm={() =>
               void run(async () => {
                 const receipt = await api("confirm", "POST", {
@@ -1644,9 +1839,14 @@ export default function Workspace() {
                 reviewedForm.current?.reset();
                 reviewedForm.current = null;
                 setEdit(null);
+                const destination = pageDraft.committed();
                 setReview(null);
                 setNotice(`Change saved. Receipt ${receipt.id}.`);
-                await refresh();
+                try {
+                  await refresh();
+                } finally {
+                  if (destination) navigateNow(destination);
+                }
               })
             }
           />

@@ -1,3 +1,4 @@
+import { afterOpening } from "./domain";
 import {
   addDays,
   sumMoney,
@@ -153,7 +154,11 @@ export function runningBalances(account: Account, transactions: Transaction[]) {
       values.set(t.id, null);
       continue;
     }
-    if (signed !== null && t.date > account.asOf && t.status === "cleared")
+    if (
+      signed !== null &&
+      afterOpening(account, t.date) &&
+      t.status === "cleared"
+    )
       signed = sumMoney([signed, t.amount]);
     values.set(
       t.id,

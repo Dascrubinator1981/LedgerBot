@@ -54,3 +54,7 @@ The Docker candidate binds only to loopback during local rehearsal, runs as an u
 ## November 6 usability upgrade
 
 Apply PostgreSQL migration `008_forecast_preferences.sql` (SQLite migration version 6) for per-owner Dashboard Forecaster display settings. Migrations are additive; preserve databases and keys. Budget proposals may include a new category and its monthly target; the existing confirmation transaction saves both atomically. Deferred page-wide review, longer draft retention and email/SMS reminders are not activated. See `UX_REVIEW_AND_NEXT_STAGES.md` and `UPDATE_WINDOWS_COPY.md`.
+
+## Local saved-review key
+
+SQLite saved reviews use an AES-GCM key in a matching `.draft-key` file beside the database (created with restrictive permissions where supported). Preserve the database and key together in private backups. Do not commit, upload or delete either to update. PostgreSQL uses the existing versioned server key ring. Expiry stops approval and removes active Inbox items; it does not securely erase retained history. Hosted retention and erasure policy remains a beta gate.

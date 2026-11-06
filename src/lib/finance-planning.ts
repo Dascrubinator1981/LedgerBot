@@ -1,3 +1,5 @@
+import { periodBudgetTarget } from "./budget-period";
+import { afterOpening } from "./domain";
 import { randomUUID } from "node:crypto";
 import { z } from "./schema";
 import {
@@ -7,7 +9,7 @@ import {
   transactionRecordSchema,
   sumMoney,
   type FinanceState,
-  type Operation,
+  type SingleOperation as Operation,
   type Occurrence,
   type Recurrence,
   type Transaction,
@@ -16,26 +18,42 @@ import {
 import type { FinanceDb } from "./finance-db";
 import { PublicError } from "./errors";
 import { verifyDigest } from "./proposal-integrity";
-async function source(db: FinanceDb, userId: string, id: string) {
+async function source(
+  db: FinanceDb,
+  userId: string,
+  id: string,
+  index?: number,
+) {
   const row = (await db
     .prepare("SELECT data FROM proposals WHERE id=? AND user_id=?")
     .get(id, userId)) as { data: string } | undefined;
   if (!row) throw new PublicError("Record unavailable");
   const p = JSON.parse(row.data) as Proposal;
   verifyDigest(userId, p);
-  if (p.status !== "approved" || p.operation.kind !== "deleteTransaction")
+  const operation =
+    p.operation.kind === "batch" && index !== undefined
+      ? p.operation.operations[index]
+      : p.operation;
+  if (p.status !== "approved" || operation?.kind !== "deleteTransaction")
     throw new PublicError("Only an approved deletion can be restored");
+  const previous =
+    p.operation.kind === "batch" && index !== undefined
+      ? (p.before as unknown[])[index]
+      : p.before;
   return z
     .array(transactionRecordSchema)
     .min(1)
     .max(2)
-    .parse(Array.isArray(p.before) ? p.before : [p.before]);
+    .parse(Array.isArray(previous) ? previous : [previous]);
 }
 export async function normalizePlanning(
   db: FinanceDb,
   userId: string,
   op: Operation,
 ): Promise<Operation> {
+  if (op.kind === "category" && !op.id) op = { ...op, id: randomUUID() };
+  if (op.kind === "budget" && op.period)
+    op = { ...op, target: periodBudgetTarget(op.month, op.period).target };
   if (op.kind === "editTransaction" && op.flow === undefined) {
     const row = (await db
       .prepare("SELECT data FROM transactions WHERE id=? AND user_id=?")
@@ -47,7 +65,15 @@ export async function normalizePlanning(
   if (op.kind === "transaction" || op.kind === "editTransaction")
     op = { ...op, flow: op.flow || (op.amount < 0 ? "expense" : "income") };
   if (op.kind === "restoreTransaction")
-    return { ...op, entries: await source(db, userId, op.sourceProposalId) };
+    return {
+      ...op,
+      entries: await source(
+        db,
+        userId,
+        op.sourceProposalId,
+        op.sourceOperationIndex,
+      ),
+    };
   if (op.kind === "editTransaction" && op.occurrence === undefined) {
     const row = (await db
       .prepare("SELECT data FROM transactions WHERE id=? AND user_id=?")
@@ -237,7 +263,7 @@ export async function validatePlanning(
       throw new PublicError("Choose two different accounts");
     for (const id of [op.fromId, op.toId]) {
       const a = account(id);
-      if (op.date <= a.asOf || op.date > today)
+      if (!afterOpening(a, op.date) || op.date > today)
         throw new PublicError(
           "Transfer date must follow the snapshot and be no later than today",
         );
@@ -264,7 +290,7 @@ export async function validatePlanning(
         "Only an unreconciled pending pair can be marked cleared",
       );
     for (const leg of pair) {
-      if (op.date <= account(leg.accountId).asOf || op.date > today)
+      if (!afterOpening(account(leg.accountId), op.date) || op.date > today)
         throw new PublicError(
           "Cleared date must be after the opening snapshot and no later than today",
         );
@@ -272,7 +298,12 @@ export async function validatePlanning(
     }
   }
   if (op.kind === "restoreTransaction") {
-    const entries = await source(db, userId, op.sourceProposalId);
+    const entries = await source(
+      db,
+      userId,
+      op.sourceProposalId,
+      op.sourceOperationIndex,
+    );
     if (JSON.stringify(entries) !== JSON.stringify(op.entries))
       throw new PublicError("Restore does not match the approved deletion");
     for (const entry of entries) {
@@ -285,7 +316,11 @@ export async function validatePlanning(
         )
       )
         throw new PublicError("These records have already been restored");
-      if (entry.date <= a.asOf || entry.date > today || entry.reconciledAt)
+      if (
+        !afterOpening(a, entry.date) ||
+        entry.date > today ||
+        entry.reconciledAt
+      )
         throw new PublicError(
           "A deleted entry cannot be restored into this snapshot or reconciled period",
         );
@@ -391,7 +426,12 @@ export async function applyPlanning(
       const next =
         op.kind === "renameAccount"
           ? { ...old, name: op.name }
-          : { ...old, opening: op.opening, asOf: op.asOf };
+          : {
+              ...old,
+              opening: op.opening,
+              asOf: op.asOf,
+              openingBasis: op.openingBasis || old.openingBasis || "end-of-day",
+            };
       await db
         .prepare("UPDATE accounts SET data=? WHERE id=? AND user_id=?")
         .run(JSON.stringify(next), op.id, userId);

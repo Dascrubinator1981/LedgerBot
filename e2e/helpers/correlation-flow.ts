@@ -1,5 +1,7 @@
+import { openReview } from "./open-review";
 import { expect, type Page } from "@playwright/test";
 async function approve(page: Page) {
+  await openReview(page);
   const dialog = page.getByRole("dialog");
   await dialog
     .getByRole("button", { name: "Use accessible confirmation" })

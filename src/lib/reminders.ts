@@ -8,6 +8,7 @@ export const remindersSchema = z
     accounts: reminderSchema.optional(),
     budget: reminderSchema.optional(),
     forecast: reminderSchema.optional(),
+    reviews: reminderSchema.optional(),
   })
   .strict();
 export type Reminders = z.infer<typeof remindersSchema>;

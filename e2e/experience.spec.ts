@@ -1,3 +1,4 @@
+import { openReview } from "./helpers/open-review";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 test("deep links, reminder persistence, keyboard, zoom, and cross-tab financial invalidation", async ({
@@ -12,9 +13,7 @@ test("deep links, reminder persistence, keyboard, zoom, and cross-tab financial 
     .getByLabel("Password (at least 12 characters)")
     .fill("fabricated-experience-password");
   await page.getByRole("button", { name: "Create my empty account" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Your financial workspace" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Forecast" })).toBeVisible();
   await page.getByRole("link", { name: "Settings", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/section=settings/);
@@ -58,7 +57,10 @@ test("deep links, reminder persistence, keyboard, zoom, and cross-tab financial 
     .getByLabel("Opening balance ($, positive owed for liabilities)")
     .fill("0");
   await page.getByLabel("Opening as-of date").fill("2026-01-01");
-  await page.getByRole("button", { name: "Prepare account for review" }).click();
+  await page
+    .getByRole("button", { name: "Prepare account for review" })
+    .click();
+  await openReview(page);
   const dialog = page.getByRole("dialog");
   expect(
     (

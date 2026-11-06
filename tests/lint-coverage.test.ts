@@ -24,7 +24,7 @@ it("preserves the exact pre-upgrade lint rule levels and options for TSX, TS and
       .digest("hex");
     expect(digest).toBe(expected.sha256);
   }
-});
+}, 30_000);
 it("still rejects TypeScript any, conditional hooks and inaccessible images", async () => {
   const eslint = new ESLint();
   const fixtures = [

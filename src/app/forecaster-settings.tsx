@@ -3,6 +3,8 @@ import {
   defaultForecastPreferences,
   type ForecastPreferences,
 } from "@/lib/forecast-preferences";
+import { parseMoney } from "@/lib/domain";
+import { Input, dollars } from "./components";
 import type { FinanceState } from "@/lib/domain";
 export function ForecasterSettings({
   state,
@@ -34,6 +36,11 @@ export function ForecasterSettings({
             showChart: f.has("forecastChart"),
             showRecentBills: f.has("forecastRecent"),
             showDailyDetails: f.has("forecastDaily"),
+            lowBalanceCents: parseMoney(String(f.get("lowBalance"))),
+            nearBudgetPercent: Number(f.get("nearBudget")),
+            quickActions: f
+              .getAll("quickAction")
+              .map(String) as ForecastPreferences["quickActions"],
           });
         }}
       >
@@ -47,6 +54,46 @@ export function ForecasterSettings({
             ))}
           </select>
         </label>
+        <Input
+          label="Low balance warning cushion ($)"
+          name="lowBalance"
+          value={dollars(p.lowBalanceCents)}
+        />
+        <label>
+          Spending warning threshold (%)
+          <input
+            name="nearBudget"
+            type="number"
+            min="1"
+            max="100"
+            defaultValue={p.nearBudgetPercent}
+            required
+          />
+        </label>
+        <fieldset>
+          <legend>Quick actions</legend>
+          {(
+            [
+              "Ledger",
+              "Budget",
+              "Accounts",
+              "Inbox",
+              "Settings",
+              "Debt Tools",
+              "Savings Plan",
+            ] as const
+          ).map((action) => (
+            <label className="checkbox" key={action}>
+              <input
+                name="quickAction"
+                type="checkbox"
+                value={action}
+                defaultChecked={p.quickActions.includes(action)}
+              />
+              {action}
+            </label>
+          ))}
+        </fieldset>
         <fieldset>
           <legend>Accounts in forecast</legend>
           {state.accounts.map((a) => (

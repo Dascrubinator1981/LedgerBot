@@ -461,3 +461,126 @@ main {
     gap: 0.65rem;
   }
 }
+.forecast-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.forecast-layout > div {
+  min-width: 0;
+}
+.period-chart {
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  margin: 0.75rem 0;
+}
+.period-chart .finance-chart {
+  max-height: 125px;
+  margin: 0.5rem 0;
+}
+.chart-key {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+.chart-key i {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-right: 0.3rem;
+  border-radius: 50%;
+}
+.balance-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding: 0.7rem 0;
+}
+.quick-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.8rem 0;
+}
+.quick-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+  width: 100%;
+}
+.quick-strip button {
+  flex: 1 1 120px;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.quick-strip small {
+  display: block;
+}
+.quick-strip.overflow {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  scroll-snap-type: x mandatory;
+  touch-action: pan-y;
+}
+.quick-strip.overflow button {
+  flex: 0 0 140px;
+  scroll-snap-align: start;
+}
+.outlook.red {
+  border-left-color: #f0a0a0;
+}
+.outlook.yellow {
+  border-left-color: #f0c878;
+}
+.outlook.green {
+  border-left-color: #66e5ca;
+}
+.outlook.unknown {
+  border-left-color: #b5c5d8;
+}
+@media (max-width: 800px) {
+  .forecast-layout {
+    grid-template-columns: 1fr;
+  }
+  .quick-actions > button {
+    padding: 0.5rem;
+  }
+}
+/* Contain grid min-content width: only an explicitly overflowing tab strip moves. */
+.shell {
+  grid-template-columns: 230px minmax(0, 1fr);
+}
+.sidebar {
+  min-width: 0;
+}
+.quick-actions {
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+.quick-actions > button {
+  flex-shrink: 0;
+}
+.quick-strip {
+  flex: 1 1 0;
+}
+@media (max-width: 760px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sidebar nav {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .sidebar nav a {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

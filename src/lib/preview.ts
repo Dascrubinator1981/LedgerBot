@@ -5,7 +5,7 @@ import {
   addDays,
   netWorth,
   type FinanceState,
-  type Operation,
+  type SingleOperation as Operation,
   type Transaction,
 } from "./domain";
 import { budgetProgress } from "./insights";
@@ -44,7 +44,13 @@ export function financialImpact(state: FinanceState, op: Operation): Impact {
       accounts[index] =
         op.kind === "renameAccount"
           ? { ...accounts[index], name: op.name }
-          : { ...accounts[index], opening: op.opening, asOf: op.asOf };
+          : {
+              ...accounts[index],
+              opening: op.opening,
+              asOf: op.asOf,
+              openingBasis:
+                op.openingBasis || accounts[index].openingBasis || "end-of-day",
+            };
   }
   if (op.kind === "account")
     accounts.push({
@@ -53,6 +59,7 @@ export function financialImpact(state: FinanceState, op: Operation): Impact {
       type: op.type,
       opening: op.opening,
       asOf: op.asOf,
+      openingBasis: op.openingBasis || "end-of-day",
       currency: "USD",
     });
   if (op.kind === "transaction" || op.kind === "editTransaction") {
@@ -196,6 +203,16 @@ export function financialImpact(state: FinanceState, op: Operation): Impact {
         : "date" in op
           ? op.date.slice(0, 7)
           : today.slice(0, 7);
+  return financialComparison(state, after, month);
+}
+export function financialComparison(
+  state: FinanceState,
+  after: FinanceState,
+  month = civilToday(state.settings.timezone).slice(0, 7),
+): Impact {
+  const accounts = after.accounts,
+    transactions = after.transactions,
+    today = civilToday(state.settings.timezone);
   const beforeBudget = budgetProgress(state, month, today),
     afterBudget = budgetProgress(after, month, today);
   const low = (s: FinanceState) => {

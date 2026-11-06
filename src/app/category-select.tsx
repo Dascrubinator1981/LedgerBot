@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
+import { LabelSuggestions } from "./label-entry";
 import type { Category } from "@/lib/domain";
 export function CategorySelect({
   categories,
@@ -85,6 +86,16 @@ export function CategorySelect({
               }}
             />
           </label>
+          <LabelSuggestions
+            value={draftName}
+            existing={categories.map((c) => c.name)}
+            onUse={(name) => {
+              const chosen = categories.find((c) => c.name === name)!;
+              previous.current = chosen.id;
+              if (select.current) select.current.value = chosen.id;
+              setAdding(false);
+            }}
+          />
           <p>
             Your entry stays here while you review the category separately.
             After approval, select it from the list. Nothing is added until you

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     );
     const suffix =
       request.nextUrl.searchParams.get("flow") === "recovery"
-        ? "?recovery=1"
+        ? "?section=settings&recovery=1"
         : "";
     return auth.finish(
       setAppCookie(NextResponse.redirect(`${origin}/${suffix}`), session.token),

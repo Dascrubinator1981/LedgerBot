@@ -1,3 +1,5 @@
+import { savedPageFlow } from "./helpers/saved-page-flow";
+import { openReview } from "./helpers/open-review";
 import { ownerFeedbackFlow } from "./helpers/owner-feedback-flow";
 import { sessionFlow } from "./helpers/session-flow";
 import { inlineCategoryFlow } from "./helpers/inline-category-flow";
@@ -11,12 +13,11 @@ async function signup(page: Page) {
     .getByLabel("Password (at least 12 characters)")
     .fill("fabricated-password-123");
   await page.getByRole("button", { name: "Create my empty account" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Your financial workspace" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Forecast" })).toBeVisible();
   return email;
 }
 async function approve(page: Page) {
+  await openReview(page);
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await dialog
@@ -49,6 +50,7 @@ test("two users, empty start, reviewed account, expense, reload, and isolation",
   await page
     .getByRole("button", { name: "Prepare account for review" })
     .click();
+  await openReview(page);
   await expect(
     page.getByRole("dialog").getByText("Nothing saved yet.", { exact: false }),
   ).toBeVisible();
@@ -111,15 +113,26 @@ test("cancelled review stays a draft, keyboard confirmation saves known zero", a
   await page
     .getByRole("button", { name: "Prepare account for review" })
     .click();
+  await openReview(page);
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: "Cancel / save for later" })
+    .getByRole("button", { name: "Cancel review / keep page draft" })
     .click();
   expect(
     (await (await page.request.get("/api/state")).json()).accounts,
   ).toHaveLength(0);
   await page.getByRole("link", { name: /Inbox/ }).click();
-  await page.getByRole("button", { name: "Review exact changes" }).click();
+  await page
+    .getByRole("button", { name: "Save changes for later review", exact: true })
+    .last()
+    .click();
+  await page
+    .getByRole("button", { name: "Save for later", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Resume saved review", exact: true })
+    .click();
+  await openReview(page);
   const dialog = page.getByRole("dialog");
   await dialog
     .getByRole("button", { name: "Use accessible confirmation" })
@@ -149,6 +162,7 @@ test("slide requires release and aborted slide cannot commit", async ({
   await page
     .getByRole("button", { name: "Prepare account for review" })
     .click();
+  await openReview(page);
   const dialog = page.getByRole("dialog");
   const thumb = dialog.getByRole("button", {
     name: "Slide to confirm; accessible confirmation available below",
@@ -211,6 +225,7 @@ test("successful commit receipt survives a failed balance refresh", async ({
   await page
     .getByRole("button", { name: "Prepare account for review" })
     .click();
+  await openReview(page);
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await page.route("**/api/state", (route) =>
@@ -357,7 +372,10 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
   expect(after.recurrences).toHaveLength(1);
   await page.getByRole("link", { name: "Dashboard", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Forecaster", exact: true }),
+    page.getByRole("heading", {
+      name: "Your outlook: Needs information",
+      exact: false,
+    }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await page
@@ -434,4 +452,55 @@ test("owner-reported split, inline failures, reconciliation and automatic foreca
 }) => {
   await signup(page);
   await ownerFeedbackFlow(page, approve);
+});
+
+test("unfinished page saves encrypted and resumes a same-day transaction without duplication", async ({
+  page,
+}) => {
+  await signup(page);
+  await savedPageFlow(page, approve);
+});
+
+test("custom quick actions move only their strip and held swipes do not navigate", async ({
+  page,
+}) => {
+  await signup(page);
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  const controls = page.getByRole("group", {
+    name: "Quick actions",
+    exact: true,
+  });
+  for (const box of await controls.getByRole("checkbox").all())
+    await box.check();
+  await page.getByRole("button", { name: "Save Forecaster display" }).click();
+  await expect(page.getByRole("status")).toContainText(
+    "Forecaster display saved",
+  );
+  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const strip = page.locator(".quick-strip.overflow");
+  await page.getByRole("button", { name: "More →", exact: true }).click();
+  await expect
+    .poll(() => strip.evaluate((e) => e.scrollLeft))
+    .toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.scrollX)).toBe(0);
+  await page.getByRole("button", { name: "← Back", exact: true }).click();
+  await expect.poll(() => strip.evaluate((e) => e.scrollLeft)).toBe(0);
+  const box = (await strip.boundingBox())!;
+  await page.mouse.move(box.x + box.width - 15, box.y + 20);
+  await page.mouse.down();
+  await page.waitForTimeout(450);
+  await page.mouse.move(box.x + 10, box.y + 20, { steps: 10 });
+  await page.mouse.up();
+  await expect
+    .poll(() => strip.evaluate((e) => e.scrollLeft))
+    .toBeGreaterThan(0);
+  await expect(
+    page.getByRole("heading", { name: "Forecast", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });

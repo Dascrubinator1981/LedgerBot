@@ -9,6 +9,22 @@ export const forecastPreferencesSchema = z
     showChart: z.boolean().default(true),
     showRecentBills: z.boolean().default(true),
     showDailyDetails: z.boolean().default(false),
+    lowBalanceCents: z.number().int().min(0).max(100000000000).default(0),
+    nearBudgetPercent: z.number().int().min(1).max(100).default(85),
+    quickActions: z
+      .array(
+        z.enum([
+          "Ledger",
+          "Budget",
+          "Accounts",
+          "Inbox",
+          "Settings",
+          "Debt Tools",
+          "Savings Plan",
+        ]),
+      )
+      .max(10)
+      .default(["Ledger", "Budget", "Debt Tools", "Savings Plan"]),
   })
   .strict();
 export type ForecastPreferences = z.infer<typeof forecastPreferencesSchema>;

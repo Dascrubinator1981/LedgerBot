@@ -1,3 +1,4 @@
+import { openReview } from "./open-review";
 import { expect, type Page } from "@playwright/test";
 export async function sessionFlow(
   page: Page,
@@ -14,9 +15,7 @@ export async function sessionFlow(
     .getByLabel("Password (at least 12 characters)", { exact: true })
     .fill(password);
   await other.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    other.getByRole("heading", { name: "Your financial workspace" }),
-  ).toBeVisible();
+  await expect(other.getByRole("heading", { name: "Forecast" })).toBeVisible();
   await other.getByRole("link", { name: "Budget", exact: true }).click();
   await other
     .getByLabel("New category name")
@@ -24,6 +23,7 @@ export async function sessionFlow(
   await other
     .getByRole("button", { name: "Prepare category", exact: true })
     .click();
+  await openReview(other);
   await expect(other.getByRole("dialog")).toBeVisible();
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page
