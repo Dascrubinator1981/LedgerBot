@@ -83,6 +83,7 @@ export const operationSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("budget"),
     categoryId: id,
+    newCategory: z.object({ name }).optional(),
     month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
     target: minor.refine((v) => v >= 0),
   }),
@@ -226,6 +227,7 @@ export type FinanceState = {
     promotions: boolean;
     timezone?: string;
     reminders?: import("./reminders").Reminders;
+    forecaster?: import("./forecast-preferences").ForecastPreferences;
   };
 };
 export const timezoneSchema = z

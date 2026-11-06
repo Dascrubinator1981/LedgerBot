@@ -50,3 +50,7 @@ Production candidates disable the application's public signup UI and reject dire
 Settings lists active app sign-ins using public domain-separated handles, not stored session verifiers or tokens. A fresh five-minute human sign-in is required to revoke another session. Revocation expires its app access and invalidates its approval challenges atomically, recording an append-only owner-scoped security event. It is not global provider logout or a password reset. Change a compromised password too. Expired metadata/closure retention still needs owner/legal policy and an approved cleanup lifecycle before real customer use.
 
 The Docker candidate binds only to loopback during local rehearsal, runs as an unprivileged user with a read-only filesystem and dropped capabilities, and excludes local data/credential files. See deploy/README.md for the proposed hosting boundary. This local package is not a hosted beta or approval to deploy one.
+
+## November 6 usability upgrade
+
+Apply PostgreSQL migration `008_forecast_preferences.sql` (SQLite migration version 6) for per-owner Dashboard Forecaster display settings. Migrations are additive; preserve databases and keys. Budget proposals may include a new category and its monthly target; the existing confirmation transaction saves both atomically. Deferred page-wide review, longer draft retention and email/SMS reminders are not activated. See `UX_REVIEW_AND_NEXT_STAGES.md` and `UPDATE_WINDOWS_COPY.md`.

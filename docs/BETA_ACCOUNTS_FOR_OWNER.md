@@ -1,5 +1,7 @@
 # The first account we need — no coding required
 
+> Owner update, November 6: the owner reports the Free LedgerBot organization and LedgerBot Beta project are created in Oregon, with Data API disabled and public signup saved as disabled. This is reported dashboard setup, not an independently verified hosted LedgerBot deployment. The remaining hosting, database-role/migration, mail and recovery steps still apply.
+
 You do **not** need to install Node.js on your iPhone or Steam Deck. Once a private beta is approved and hosted, those devices will open a normal HTTPS website.
 
 Two services will eventually be involved:
@@ -7,7 +9,7 @@ Two services will eventually be involved:
 - **Supabase:** holds the private database and handles verified sign-in/recovery.
 - **Website hosting:** runs LedgerBot and gives it a secure web address. The application now has a tested portable container, so hosting is not tied to one vendor yet.
 
-Neither is created or authorized in the connected environment. No live beta URL exists. The goal is a closed manual-finance test beta in November, subject to configuration, safety gates and owner approval; this is not a promised launch date.
+No hosted deployment credentials or hosting account are configured in the connected environment. No live beta URL exists. The goal is a closed manual-finance test beta in November, subject to configuration, safety gates and owner approval; this is not a promised launch date.
 
 ## The first small owner step, when ready
 

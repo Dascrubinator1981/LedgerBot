@@ -102,28 +102,30 @@ export async function inlineCategoryFlow(page: Page) {
   await page
     .getByLabel("Budget category", { exact: true })
     .selectOption("+add");
+  await page.getByLabel("New budget category name").fill("Synthetic household");
+  await page.getByRole("button", { name: "Prepare budget target" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  data = await (await page.request.get("/api/state")).json();
+  expect(data.categories).toHaveLength(1);
+  expect(data.budgets).toEqual([]);
   await page
-    .getByLabel("New category for Budget category")
-    .fill("Synthetic household");
-  await page
-    .getByRole("button", { name: "Keep working without adding" })
+    .getByRole("dialog")
+    .getByRole("button", { name: /Cancel|Keep.*draft/i })
     .click();
-  await expect(page.getByLabel("Budget category", { exact: true })).toHaveValue(
-    data.categories[0].id,
+  await expect(page.getByLabel("New budget category name")).toHaveValue(
+    "Synthetic household",
   );
-  await page
-    .getByLabel("Budget category", { exact: true })
-    .selectOption("+add");
-  await page
-    .getByRole("button", { name: "Review new category", exact: true })
-    .click();
-  await approve(page);
   await expect(page.getByLabel("Planned target ($)")).toHaveValue("123.45");
-  await page
-    .getByLabel("Budget category", { exact: true })
-    .selectOption({ label: "Synthetic household" });
+  await page.getByRole("button", { name: "Prepare budget target" }).click();
+  await approve(page);
   data = await (await page.request.get("/api/state")).json();
   expect(data.categories).toHaveLength(2);
   expect(data.transactions).toHaveLength(1);
-  expect(data.budgets).toEqual([]);
+  expect(data.budgets).toHaveLength(1);
+  expect(data.budgets[0].target).toBe(12345);
+  expect(
+    data.categories.find(
+      (c: { id: string; name: string }) => c.id === data.budgets[0].categoryId,
+    ).name,
+  ).toBe("Synthetic household");
 }

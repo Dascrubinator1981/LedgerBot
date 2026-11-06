@@ -38,7 +38,10 @@ export async function correlationFlow(page: Page) {
   await page.getByLabel("Planned target ($)").fill("100");
   await page.getByRole("button", { name: "Prepare budget target" }).click();
   await approve(page);
-  await page.getByRole("link", { name: "Forecaster", exact: true }).click();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await page
+    .getByText("Manage forecast bills and income plans", { exact: true })
+    .click();
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Correlation pocket · checking" });
@@ -138,8 +141,8 @@ export async function correlationFlow(page: Page) {
   );
   await page.getByLabel("Chart month", { exact: true }).fill(chartMonth);
   await expect(page.getByTestId("budget-actual")).toHaveText("$105.00");
-  await page.getByRole("link", { name: "Forecaster", exact: true }).click();
-  const recent = page.locator(".card").filter({
+  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+  const recent = page.locator("#forecast section.card").filter({
     has: page.getByRole("heading", {
       name: "Bill payments in the last 7 days",
       exact: true,

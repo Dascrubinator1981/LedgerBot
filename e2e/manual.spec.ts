@@ -1,3 +1,4 @@
+import { ownerFeedbackFlow } from "./helpers/owner-feedback-flow";
 import { sessionFlow } from "./helpers/session-flow";
 import { inlineCategoryFlow } from "./helpers/inline-category-flow";
 import { correlationFlow } from "./helpers/correlation-flow";
@@ -333,7 +334,10 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
     page.getByText("Cleared actuals: $12.00", { exact: true }),
   ).toBeVisible();
   const before = await (await page.request.get("/api/state")).json();
-  await page.getByRole("link", { name: "Forecaster", exact: true }).click();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await page
+    .getByText("Manage forecast bills and income plans", { exact: true })
+    .click();
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Synthetic checking · checking" });
@@ -351,8 +355,9 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
   const after = await (await page.request.get("/api/state")).json();
   expect(after.transactions).toEqual(before.transactions);
   expect(after.recurrences).toHaveLength(1);
+  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
   await expect(
-    page.getByText("Preliminary / incomplete coverage", { exact: true }),
+    page.getByRole("heading", { name: "Forecaster", exact: true }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
   await page
@@ -422,4 +427,11 @@ test("owner can revoke another sign-in without permitting its prepared approval"
     "fabricated-password-123",
   );
   await context.close();
+});
+
+test("owner-reported split, inline failures, reconciliation and automatic forecast work", async ({
+  page,
+}) => {
+  await signup(page);
+  await ownerFeedbackFlow(page, approve);
 });

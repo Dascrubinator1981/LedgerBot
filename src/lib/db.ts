@@ -92,6 +92,11 @@ export function migrate(db: DatabaseSync) {
     db.exec(
       "ALTER TABLE users ADD COLUMN reminders TEXT NOT NULL DEFAULT '{}'",
     );
+  if (!columns("users").includes("forecast_preferences"))
+    db.exec(
+      "ALTER TABLE users ADD COLUMN forecast_preferences TEXT NOT NULL DEFAULT '{}'",
+    );
+  db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES(6)");
   if (!columns("sessions").includes("created_at"))
     db.exec(
       "ALTER TABLE sessions ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0",

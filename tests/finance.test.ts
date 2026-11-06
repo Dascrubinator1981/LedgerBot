@@ -581,3 +581,61 @@ describe("exact impact previews and reconciled-period integrity", () => {
     ).rejects.toThrow(/reconciled period/);
   });
 });
+
+it("creates a new category and its budget only together after independent confirmation", async () => {
+  const categoryId = randomUUID();
+  const operation: Operation = {
+    kind: "budget",
+    categoryId,
+    newCategory: { name: "Fictional supplies" },
+    month: "2026-11",
+    target: 10000,
+  };
+  const p = await propose(db, alice, operation);
+  expect((await state(db, alice.userId)).categories).toEqual([]);
+  expect((await state(db, alice.userId)).budgets).toEqual([]);
+  const r = await review(db, alice, p.id);
+  await confirm(db, alice, {
+    proposalId: p.id,
+    digest: p.digest,
+    version: p.version,
+    token: r.token,
+    idempotencyKey: randomUUID(),
+  });
+  const saved = await state(db, alice.userId);
+  expect(saved.categories).toEqual([
+    { id: categoryId, name: "Fictional supplies" },
+  ]);
+  expect(saved.budgets[0]).toMatchObject({ categoryId, target: 10000 });
+  expect(saved.accounts).toEqual([]);
+  expect((await state(db, bob.userId)).categories).toEqual([]);
+  await expect(
+    propose(db, alice, { ...operation, categoryId: randomUUID() }),
+  ).rejects.toThrow("already exists");
+});
+
+it("rolls back the new category if saving its paired budget fails", async () => {
+  const id = randomUUID();
+  const p = await propose(db, alice, {
+    kind: "budget",
+    categoryId: id,
+    newCategory: { name: "Fictional rollback" },
+    month: "2026-11",
+    target: 100,
+  });
+  const r = await review(db, alice, p.id);
+  db.exec(
+    "CREATE TRIGGER reject_budget BEFORE INSERT ON budgets BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END",
+  );
+  await expect(
+    confirm(db, alice, {
+      proposalId: p.id,
+      digest: p.digest,
+      version: p.version,
+      token: r.token,
+      idempotencyKey: randomUUID(),
+    }),
+  ).rejects.toThrow();
+  expect((await state(db, alice.userId)).categories).toEqual([]);
+  expect((await state(db, alice.userId)).budgets).toEqual([]);
+});

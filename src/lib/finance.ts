@@ -1,3 +1,4 @@
+import { forecastPreferencesSchema } from "./forecast-preferences";
 import { proposalDigest, verifyDigest } from "./proposal-integrity";
 import {
   normalizePlanning,
@@ -13,6 +14,7 @@ import type { FinanceDb } from "./finance-db";
 import { hash, secret, type Session } from "./auth";
 import {
   balance,
+  money,
   civilToday,
   type Occurrence,
   operationSchema,
@@ -81,7 +83,7 @@ export async function state(
 ): Promise<FinanceState> {
   const user = (await db
     .prepare(
-      "SELECT revision,setup,promotions,timezone,reminders FROM users WHERE id=?",
+      "SELECT revision,setup,promotions,timezone,reminders,forecast_preferences FROM users WHERE id=?",
     )
     .get(userId)) as
     | {
@@ -90,6 +92,7 @@ export async function state(
         promotions: number;
         timezone: string;
         reminders: string;
+        forecast_preferences: string;
       }
     | undefined;
   if (!user) throw new PublicError("Sign in required");
@@ -112,6 +115,9 @@ export async function state(
       promotions: !!user.promotions,
       timezone: user.timezone,
       reminders: JSON.parse(user.reminders),
+      forecaster: forecastPreferencesSchema.parse(
+        JSON.parse(user.forecast_preferences || "{}"),
+      ),
     },
   };
 }
@@ -192,8 +198,21 @@ async function validate(db: FinanceDb, userId: string, op: Operation) {
     if (op.date > civilToday(s.settings.timezone))
       throw new PublicError("Future transfers are not actuals");
   }
-  if (op.kind === "budget")
-    await owned<Category>(db, "categories", userId, op.categoryId);
+  if (op.kind === "budget") {
+    if (op.newCategory) {
+      if (
+        s.categories.some(
+          (c) =>
+            c.id === op.categoryId ||
+            c.name.toLocaleLowerCase() ===
+              op.newCategory!.name.toLocaleLowerCase(),
+        )
+      )
+        throw new PublicError(
+          "This category already exists. Select it from the list.",
+        );
+    } else await owned<Category>(db, "categories", userId, op.categoryId);
+  }
   if (op.kind === "recurrence") await account(op.accountId);
   if (op.kind === "reconcile") {
     const a = await account(op.accountId);
@@ -204,7 +223,7 @@ async function validate(db: FinanceDb, userId: string, op: Operation) {
       );
     if (balance(a, s.transactions, op.date) !== op.statement)
       throw new PublicError(
-        "Statement and cleared ledger differ. Investigate the difference before reconciling.",
+        `Statement and cleared ledger differ. Statement: ${money(op.statement)}; cleared ledger: ${money(balance(a, s.transactions, op.date))}. Investigate missing entries, dates and pending items before reconciling.`,
       );
   }
   await validatePlanning(db, userId, op, s);
@@ -423,6 +442,14 @@ async function apply(db: FinanceDb, userId: string, op: Operation) {
       break;
     }
     case "budget": {
+      if (op.newCategory)
+        await db
+          .prepare("INSERT INTO categories VALUES(?,?,?)")
+          .run(
+            op.categoryId,
+            userId,
+            JSON.stringify({ id: op.categoryId, name: op.newCategory.name }),
+          );
       const existing = (await db
         .prepare(
           "SELECT id FROM budgets WHERE user_id=? AND category_id=? AND month=?",

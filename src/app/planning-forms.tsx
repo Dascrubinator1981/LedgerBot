@@ -37,6 +37,7 @@ export function OccurrenceFields({
   current?: Transaction["occurrence"];
   today: string;
 }) {
+  const [linked, setLinked] = useState(!!current?.recurrenceId);
   return (
     <fieldset>
       <legend>Optional bill / recurring-income link</legend>
@@ -51,6 +52,7 @@ export function OccurrenceFields({
           name={`${prefix}Rule`}
           defaultValue={current?.recurrenceId || ""}
           onChange={(e) => {
+            setLinked(!!e.target.value);
             const rule = state.recurrences.find((r) => r.id === e.target.value),
               input = e.currentTarget.form?.elements.namedItem(
                 `${prefix}Due`,
@@ -80,27 +82,29 @@ export function OccurrenceFields({
           ))}
         </select>
       </Field>
-      <Input
-        name={`${prefix}Due`}
-        label={
-          prefix === "bill" ? "Occurrence due date" : "Transfer bill due date"
-        }
-        type="date"
-        value={current?.dueDate || today}
-        required={false}
-      />
-      <label className="checkbox">
-        <input
-          name={`${prefix}Settles`}
-          type="checkbox"
-          defaultChecked={current?.settles ?? true}
+      <div hidden={!linked}>
+        <Input
+          name={`${prefix}Due`}
+          label={
+            prefix === "bill" ? "Occurrence due date" : "Transfer bill due date"
+          }
+          type="date"
+          value={current?.dueDate || today}
+          required={false}
         />
-        This payment settles the selected occurrence in full
-      </label>
-      <small>
-        Check the due date. Clear this checkbox for a partial payment. This link
-        does not post an extra expense.
-      </small>
+        <label className="checkbox">
+          <input
+            name={`${prefix}Settles`}
+            type="checkbox"
+            defaultChecked={current?.settles ?? true}
+          />
+          This payment settles the selected occurrence in full
+        </label>
+        <small>
+          Check the due date. Clear this checkbox for a partial payment. This
+          link does not post an extra expense.
+        </small>
+      </div>
     </fieldset>
   );
 }

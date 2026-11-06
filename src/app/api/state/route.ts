@@ -1,3 +1,4 @@
+import { forecastPreferencesSchema } from "@/lib/forecast-preferences";
 import { NextRequest } from "next/server";
 import { z } from "@/lib/schema";
 import { state } from "@/lib/finance";
@@ -30,16 +31,32 @@ export async function PATCH(request: NextRequest) {
         promotions: z.boolean(),
         timezone: timezoneSchema.optional(),
         reminders: remindersSchema.optional(),
+        forecaster: forecastPreferencesSchema.optional(),
       })
       .parse(await body(request));
+    if (settings.forecaster?.accountIds.length) {
+      const ownedState = await state(db, s.userId, false);
+      if (
+        settings.forecaster.accountIds.some(
+          (id) => !ownedState.accounts.some((a) => a.id === id),
+        )
+      )
+        throw new PublicError("Choose only your own forecast accounts");
+    }
     await db.exec("BEGIN IMMEDIATE");
     try {
       const old = (await db
-        .prepare("SELECT timezone,reminders FROM users WHERE id=?")
-        .get(s.userId)) as { timezone: string; reminders: string };
+        .prepare(
+          "SELECT timezone,reminders,forecast_preferences FROM users WHERE id=?",
+        )
+        .get(s.userId)) as {
+        timezone: string;
+        reminders: string;
+        forecast_preferences: string;
+      };
       await db
         .prepare(
-          "UPDATE users SET setup=?,promotions=?,timezone=?,reminders=? WHERE id=?",
+          "UPDATE users SET setup=?,promotions=?,timezone=?,reminders=?,forecast_preferences=? WHERE id=?",
         )
         .run(
           settings.setup,
@@ -48,6 +65,9 @@ export async function PATCH(request: NextRequest) {
           settings.reminders
             ? JSON.stringify(settings.reminders)
             : old.reminders,
+          settings.forecaster
+            ? JSON.stringify(settings.forecaster)
+            : old.forecast_preferences,
           s.userId,
         );
       if (settings.timezone && settings.timezone !== old.timezone)

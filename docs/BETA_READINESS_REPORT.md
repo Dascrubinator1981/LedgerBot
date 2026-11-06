@@ -1,3 +1,5 @@
+> Follow-up usability work is documented in [UX_REVIEW_AND_NEXT_STAGES.md](UX_REVIEW_AND_NEXT_STAGES.md). The evidence below describes the earlier November 5 checkpoint; consult the follow-up report for new tests, migration 008 and current scope.
+
 # LedgerBot manual beta readiness — November 5, 2026
 
 ## If you opened the app today

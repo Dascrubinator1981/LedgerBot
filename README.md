@@ -81,3 +81,5 @@ The next staged implementation prompt is [CODEX_PRIVATE_BETA_PROMPT.md](docs/COD
 See [architecture](docs/ARCHITECTURE.md), [data model](docs/DATA_MODEL.md), [financial conventions](docs/FINANCIAL_ENGINE.md), [security](docs/SECURITY.md), [test plan](docs/TEST_PLAN.md), and [release status](docs/RELEASE_STATUS.md).
 
 The complete product and staged contract remain partially implemented. PostgreSQL RLS, verified email recovery, encrypted drafts, occurrence matching, naming, reviewed restore, exports, graphs, navigation and a local recovery drill are now present. Hosted configuration, independent security/device testing, retention/erasure, key rotation, bounded backend pagination and further release assurance are unfinished. No real financial information is committed; no vendor integration or publication has been enabled.
+
+Latest usability follow-up: [changes and remaining stages](docs/UX_REVIEW_AND_NEXT_STAGES.md), [update your Windows copy](docs/UPDATE_WINDOWS_COPY.md).

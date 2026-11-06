@@ -40,7 +40,11 @@ import {
 } from "@/lib/navigation";
 import { SetupReminders } from "./setup-reminders";
 import { BudgetExplorer } from "./budget-explorer";
-import { CategorySelect } from "./category-select";
+import { BudgetTargetForm } from "./budget-target-form";
+import { DashboardForecast } from "./dashboard-forecast";
+import { ForecasterSettings } from "./forecaster-settings";
+import { FormFeedback } from "./form-feedback";
+import { entryAmount } from "@/lib/transaction-entry";
 import { SessionPanel } from "./session-panel";
 import { ReconciliationInvestigator } from "./reconciliation-investigator";
 
@@ -102,6 +106,9 @@ export default function Workspace() {
     history.pushState(null, "", sectionHref(next));
   }
   const guard = useRef(false);
+  const reviewedForm = useRef<HTMLFormElement | null>(null);
+  const submittedForm = useRef<HTMLFormElement | null>(null);
+  const [failedForm, setFailedForm] = useState<HTMLFormElement | null>(null);
   async function api(path: string, method = "GET", payload?: unknown) {
     const response = await fetch(`/api/${path}`, {
       method,
@@ -234,14 +241,19 @@ export default function Workspace() {
     guard.current = true;
     setBusy(true);
     setError("");
+    setFailedForm(null);
     setNotice("");
     try {
       await action();
     } catch (e) {
+      setFailedForm(
+        submittedForm.current?.isConnected ? submittedForm.current : null,
+      );
       setError(e instanceof Error ? e.message : "Unable to complete request");
     } finally {
       setBusy(false);
       guard.current = false;
+      submittedForm.current = null;
     }
   }
   async function prepare(operation: Operation) {
@@ -268,10 +280,10 @@ export default function Workspace() {
   ) {
     event.preventDefault();
     const form = event.currentTarget;
+    submittedForm.current = form;
     void run(async () => {
       await prepare(build(new FormData(form)));
-      form.reset();
-      setEdit(null);
+      reviewedForm.current = form;
     });
   }
   const str = (f: FormData, key: string) => String(f.get(key) || "");
@@ -423,28 +435,30 @@ export default function Workspace() {
           ▣ Ledger<span>Bot</span>
         </div>
         <nav aria-label="Main navigation">
-          {tabs.map((t) => (
-            <a
-              href={sectionHref(t)}
-              key={t}
-              aria-current={tab === t ? "page" : undefined}
-              onClick={(event) => {
-                if (
-                  event.metaKey ||
-                  event.ctrlKey ||
-                  event.shiftKey ||
-                  event.altKey
-                )
-                  return;
-                event.preventDefault();
-                setTab(t);
-                setEdit(null);
-              }}
-            >
-              {t}
-              {t === "Inbox" && pending.length ? ` (${pending.length})` : ""}
-            </a>
-          ))}
+          {tabs
+            .filter((t) => t !== "Forecaster")
+            .map((t) => (
+              <a
+                href={sectionHref(t)}
+                key={t}
+                aria-current={tab === t ? "page" : undefined}
+                onClick={(event) => {
+                  if (
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  )
+                    return;
+                  event.preventDefault();
+                  setTab(t);
+                  setEdit(null);
+                }}
+              >
+                {t}
+                {t === "Inbox" && pending.length ? ` (${pending.length})` : ""}
+              </a>
+            ))}
         </nav>
         <footer>
           Manual finance · USD
@@ -466,7 +480,18 @@ export default function Workspace() {
           </button>
         </footer>
       </aside>
-      <main id="main-content">
+      <main
+        id="main-content"
+        onInvalidCapture={(event) => {
+          const input = event.target as HTMLInputElement;
+          if (input.form) {
+            setFailedForm(input.form);
+            setError(
+              `${input.labels?.[0]?.textContent || "Field"}: ${input.validationMessage}`,
+            );
+          }
+        }}
+      >
         <div className="topline">
           <div>
             <p className="eyebrow">Ledger · Plan · Possibility</p>
@@ -502,7 +527,8 @@ export default function Workspace() {
             </p>
           )}
         </div>
-        {error && (
+        <FormFeedback form={failedForm} message={error} />
+        {error && !failedForm?.isConnected && (
           <p className="notice error" role="alert">
             {error}
           </p>
@@ -596,9 +622,7 @@ export default function Workspace() {
                   Explore estimated cash from your accounts, pending entries,
                   and approved recurring assumptions.
                 </p>
-                <button onClick={() => setTab("Forecaster")}>
-                  See forecast
-                </button>
+                <a href="#forecast">See automatic forecast below</a>
               </section>
             </div>
             <BudgetCharts
@@ -614,6 +638,11 @@ export default function Workspace() {
                   `/?section=budget&month=${chartMonth}`,
                 );
               }}
+            />
+            <DashboardForecast
+              state={state}
+              today={today()}
+              onSettings={() => setTab("Settings")}
             />
             <section className="card">
               <h2>Pip’s notes</h2>
@@ -714,7 +743,9 @@ export default function Workspace() {
               <p>
                 Compare a statement against cleared actuals through its ending
                 date. A mismatch blocks reconciliation; nothing is silently
-                adjusted.
+                adjusted. This compares a statement; it does not change the
+                opening balance. To correct that date, use “Rename or correct
+                existing accounts and categories” below.
               </p>
               <form
                 onSubmit={(e) =>
@@ -775,23 +806,25 @@ export default function Workspace() {
             <section className="card">
               <h2>{edit ? "Edit transaction" : "Add deposit or expense"}</h2>
               <p>
-                Use a positive amount for income or refunds, negative for
-                expenses or card purchases. Card payments belong in Transfer.
-                Blank splits remain uncategorized.
+                Choose Expense, Income or Refund and enter the amount normally.
+                The entry type sets its direction, including split amounts. Card
+                payments belong in Transfer. Blank splits remain uncategorized.
               </p>
               <form
                 key={edit?.id || "new"}
                 onSubmit={(e) =>
                   submit(e, (f) => {
-                    const amount = parseMoney(str(f, "amount"));
+                    const flow = str(f, "flow");
+                    const amount = entryAmount(str(f, "amount"), flow);
                     const splits = Array.from(f.keys())
                       .filter(
                         (key) => key.startsWith("category-") && str(f, key),
                       )
                       .map((key) => ({
                         categoryId: str(f, key),
-                        amount: parseMoney(
+                        amount: entryAmount(
                           str(f, `splitAmount-${key.split("-")[1]}`),
+                          flow,
                         ),
                       }));
                     return {
@@ -1124,6 +1157,12 @@ export default function Workspace() {
         )}
         {tab === "Budget" && (
           <>
+            <BudgetTargetForm
+              state={state}
+              month={currentMonth}
+              busy={busy}
+              submit={submit}
+            />
             <BudgetExplorer
               state={state}
               month={chartMonth}
@@ -1153,50 +1192,6 @@ export default function Workspace() {
                 </div>
                 <div className="actions">
                   <button disabled={busy}>Prepare category</button>
-                </div>
-              </form>
-            </section>
-            <section className="card">
-              <h2>Monthly PLAN</h2>
-              <p>
-                Targets are intentions. Category rows compare approved, cleared
-                allocations. The overall chart also includes uncategorized
-                spending. These planning controls show your full plan; filters
-                above apply to the chart and matching entries.
-              </p>
-              <form
-                onSubmit={(e) =>
-                  submit(e, (f) => ({
-                    kind: "budget",
-                    categoryId: str(f, "categoryId"),
-                    month: str(f, "month"),
-                    target: parseMoney(str(f, "target")),
-                  }))
-                }
-              >
-                <div className="fields">
-                  <CategorySelect
-                    categories={state.categories}
-                    name="categoryId"
-                    label="Budget category"
-                    required
-                    busy={busy}
-                    onCreate={(name) =>
-                      void run(() => prepare({ kind: "category", name }))
-                    }
-                  />
-                  <Input
-                    label="Budget month"
-                    name="month"
-                    type="month"
-                    value={currentMonth}
-                  />
-                  <Input label="Planned target ($)" name="target" />
-                </div>
-                <div className="actions">
-                  <button disabled={busy || !state.categories.length}>
-                    Prepare budget target
-                  </button>
                 </div>
               </form>
             </section>
@@ -1437,6 +1432,31 @@ export default function Workspace() {
         )}
         {tab === "Settings" && (
           <>
+            <ForecasterSettings
+              key={`forecast-${state.revision}-${JSON.stringify(state.settings.forecaster)}`}
+              state={state}
+              busy={busy}
+              save={(forecaster) =>
+                run(async () => {
+                  await api("state", "PATCH", {
+                    ...state.settings,
+                    forecaster,
+                  });
+                  await refresh();
+                  setNotice("Forecaster display saved.");
+                })
+              }
+            />
+            <details className="card">
+              <summary>Manage forecast bills and income plans</summary>
+              <PlanningPanel
+                state={state}
+                today={today()}
+                busy={busy}
+                submit={submit}
+                prepare={(op) => void run(() => prepare(op))}
+              />
+            </details>
             <SessionPanel
               busy={busy}
               load={() => api("sessions")}
@@ -1562,7 +1582,7 @@ export default function Workspace() {
                 <button onClick={() => setTab("Accounts")}>
                   Resume account setup
                 </button>
-                <button onClick={() => setTab("Forecaster")}>
+                <button onClick={() => setTab("Dashboard")}>
                   Resume bills & income
                 </button>
                 <button onClick={() => setTab("Budget")}>
@@ -1608,6 +1628,7 @@ export default function Workspace() {
             busy={busy}
             error={error}
             onClose={() => {
+              reviewedForm.current = null;
               setReview(null);
               setNotice("Draft kept in Inbox. No financial change saved.");
             }}
@@ -1620,6 +1641,9 @@ export default function Workspace() {
                   token: review.token,
                   idempotencyKey: review.key,
                 });
+                reviewedForm.current?.reset();
+                reviewedForm.current = null;
+                setEdit(null);
                 setReview(null);
                 setNotice(`Change saved. Receipt ${receipt.id}.`);
                 await refresh();

@@ -99,8 +99,10 @@ export function SplitFields({
       <legend>Optional category allocations</legend>
       <p>
         <small>
-          Choose categories and signed amounts that sum exactly to the
-          transaction. Leave categories blank to keep it uncategorized.
+          Split amounts must add up to the total. With Expense, Income or
+          Refund, enter positive amounts; the selected entry type sets their
+          direction. With automatic direction, use signed amounts. Leave
+          categories blank to keep it uncategorized.
         </small>
       </p>
       {Array.from({ length: count }, (_, i) => (

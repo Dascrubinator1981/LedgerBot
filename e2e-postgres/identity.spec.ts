@@ -1,3 +1,4 @@
+import { ownerFeedbackFlow } from "../e2e/helpers/owner-feedback-flow";
 import { sessionFlow } from "../e2e/helpers/session-flow";
 import { inlineCategoryFlow } from "../e2e/helpers/inline-category-flow";
 import { correlationFlow } from "../e2e/helpers/correlation-flow";
@@ -217,4 +218,11 @@ test("verified owner revokes another app sign-in and its pending approval", asyn
   const context = await browser.newContext();
   await sessionFlow(page, await context.newPage(), email, password);
   await context.close();
+});
+
+test("owner-reported split and forecast preferences work with verified PostgreSQL identity", async ({
+  page,
+}) => {
+  await signup(page, `owner-flow-${crypto.randomUUID()}@example.test`);
+  await ownerFeedbackFlow(page, approve);
 });

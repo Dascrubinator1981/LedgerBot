@@ -31,10 +31,10 @@ function databasePool() {
 }
 export async function postgresReady() {
   const result = await databasePool().query(
-    "SELECT (SELECT count(*)::integer FROM ledgerbot.schema_migrations WHERE version BETWEEN 1 AND 7) AS versions,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user",
+    "SELECT (SELECT count(*)::integer FROM ledgerbot.schema_migrations WHERE version BETWEEN 1 AND 8) AS versions,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user",
   );
   const row = result.rows[0];
-  return row?.versions === 7 && !row.rolsuper && !row.rolbypassrls;
+  return row?.versions === 8 && !row.rolsuper && !row.rolbypassrls;
 }
 export class PostgresDatabase implements FinanceDb {
   private savepoint = false;
