@@ -98,6 +98,7 @@ test("verified identity, PostgreSQL ledger and second-user isolation work togeth
     .click();
   await approve(page);
   await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await page.getByRole("button", { name: "Add entry", exact: true }).click();
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Verified synthetic cash · checking" });

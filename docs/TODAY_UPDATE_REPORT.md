@@ -2,6 +2,8 @@
 
 This is a private development candidate, not a published application or a beta approval. Use invented financial information only.
 
+For the latest register-first Ledger and test-account troubleshooting walkthrough, see [LEDGER_REGISTER_REPORT.md](LEDGER_REGISTER_REPORT.md).
+
 Opt-in troubleshooting and later split-entry feedback, with their separately executed checks, are recorded in [SPLIT_ENTRY_FEEDBACK_REPORT.md](SPLIT_ENTRY_FEEDBACK_REPORT.md). The artifact scan below identifies the earlier staged image; it is not a scan of subsequent commits.
 
 ## What you would see today

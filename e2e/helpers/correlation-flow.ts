@@ -57,6 +57,7 @@ export async function correlationFlow(page: Page) {
     .click();
   await approve(page);
   await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await page.getByRole("button", { name: "Add entry", exact: true }).click();
   async function enter(description: string, amount: string, link: boolean) {
     await page
       .getByLabel("Account", { exact: true })

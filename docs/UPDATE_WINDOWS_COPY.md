@@ -2,7 +2,7 @@
 
 These instructions preserve your existing local fictional accounts and entries. Updating is separate from publishing. Stay on `feat/manual-finance-foundation`; nothing has merged into main.
 
-1. Go to VS Code. Click inside the terminal where LedgerBot is running.
+1. Save unfinished page changes for later review while the app is still running. Download any troubleshooting recording you want to keep before refreshing. Then go to VS Code and click inside the terminal where LedgerBot is running.
 2. Press **Ctrl+C**. If Windows asks `Terminate batch job (Y/N)?`, type **Y**, then Enter. Leave VS Code open.
 3. Open **GitHub Desktop**. Check **Current repository → LedgerBot** and **Current branch → feat/manual-finance-foundation**.
 4. Click **Fetch origin**. If it changes to **Pull origin**, click that too. If it reports conflicting/local source changes, stop and share the message; do not discard files or reset the repository. Generated local financial files must not be committed.
@@ -37,3 +37,7 @@ Weekly/biweekly/quarterly targets, page-wide batch review and saved-review expir
 ## If a button still seems unresponsive
 
 After updating, use **Help troubleshoot → Start fresh recording**, close the dialog and try the action. Reopen it and choose **Download safe report** before refreshing. See [the step-by-step guide](TROUBLESHOOTING.md). Preparation now moves to the review queue with an explicit notice; your balances change only after confirmation. Tomorrow is a scheduled item, not a pending actual payment.
+
+## Register-first Ledger
+
+After this update, Ledger shows account balances and Transactions first. Use Add entry, select a row and Edit selected, or choose Transfer / card payment. Entry forms are folded away until needed. Full walkthrough: [LEDGER_REGISTER_REPORT.md](LEDGER_REGISTER_REPORT.md).

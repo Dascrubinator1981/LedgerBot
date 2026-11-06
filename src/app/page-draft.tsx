@@ -113,6 +113,8 @@ export function usePageDraft({
         if (attempts++ < 50) frame = requestAnimationFrame(applySnapshot);
         return;
       }
+      const disclosure = form.closest("details");
+      if (disclosure) disclosure.open = true;
       let missing = false;
       for (const control of Array.from(form.elements))
         if (

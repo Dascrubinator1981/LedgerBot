@@ -12,7 +12,7 @@
     "Context": 74,
     "Policy / bounded verification": 17,
     "Partial": 162,
-    "Implemented; local evidence": 35,
+    "Implemented; local evidence": 36,
     "Not implemented": 55,
     "Superseded in part": 1,
     "Partial / not implemented": 59,
@@ -6892,6 +6892,21 @@
       "evidence": [
         "deploy/README.md",
         "docs/DEVICE_TESTING_GUIDE.md"
+      ]
+    },
+    {
+      "id": "conversation:LEDGERREGISTER",
+      "source": "Latest user conversation",
+      "line": null,
+      "section": "User requests (latest precedence)",
+      "text": "Open Ledger on line-by-line posted transactions and per-account balances; compact Add/Edit/Transfer actions, categories, running balances and vertical mobile rows.",
+      "status": "Implemented; local evidence",
+      "assessment": "User request, not a command extracted from an attachment.",
+      "evidence": [
+        "src/app/workspace.tsx",
+        "src/lib/insights.ts",
+        "e2e/manual.spec.ts",
+        "docs/LEDGER_REGISTER_REPORT.md"
       ]
     },
     {

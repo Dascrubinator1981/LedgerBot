@@ -72,6 +72,7 @@ export default function Workspace() {
       key: string;
     } | null>(null),
     [edit, setEdit] = useState<Transaction | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState("");
   const [accountFilter, setAccountFilter] = useState(""),
     [statusFilter, setStatusFilter] = useState(""),
     [query, setQuery] = useState(""),
@@ -112,6 +113,34 @@ export default function Workspace() {
   );
   const updates = useRef<BroadcastChannel | null>(null);
   const requestSequence = useRef(0);
+  function openLedgerForm(kind: "transaction" | "transfer") {
+    requestAnimationFrame(() => {
+      const panel = document.getElementById(
+        `ledger-${kind}-editor`,
+      ) as HTMLDetailsElement | null;
+      if (!panel) return;
+      panel.open = true;
+      panel.scrollIntoView({ block: "start" });
+      panel
+        .querySelector<HTMLInputElement | HTMLSelectElement>("input, select")
+        ?.focus();
+    });
+  }
+  function editLedgerRow(transaction: Transaction) {
+    if (pageDraft.dirty) {
+      setNotice(
+        "Finish preparing your current entry, or save it for later, before editing another transaction.",
+      );
+      return;
+    }
+    if (transaction.transferId) {
+      setTransferEdit(transaction);
+      openLedgerForm("transfer");
+    } else {
+      setEdit(transaction);
+      openLedgerForm("transaction");
+    }
+  }
   function navigateNow(next: Tab | "SignOut") {
     if (next === "SignOut") {
       void api("auth", "DELETE", {})
@@ -530,6 +559,16 @@ export default function Workspace() {
     ],
   };
   const transactions = sortedTransactions;
+  const visibleTransactions = transactions.filter(
+    (t) =>
+      (!accountFilter || t.accountId === accountFilter) &&
+      (!statusFilter || t.status === statusFilter) &&
+      t.description.toLowerCase().includes(query.toLowerCase()) &&
+      (!monthFilter || t.date.startsWith(monthFilter)),
+  );
+  const selectedLedgerRow = visibleTransactions.find(
+    (t) => t.id === selectedTransaction,
+  );
   const projections = projected!;
   const chartMonth = budgetMonth || today().slice(0, 7);
   const running = runningValues;
@@ -644,7 +683,14 @@ export default function Workspace() {
           <div className="actions">
             <TroubleshootingPanel key={csrf} recorder={troubleshooting} />
             <span className="pill">Manual · no live integrations</span>
-            <button className="primary" onClick={() => setTab("Ledger")}>
+            <button
+              className="primary"
+              onClick={() => {
+                setTab("Ledger");
+                if (tab === "Ledger" || !pageDraft.hasChanges)
+                  openLedgerForm("transaction");
+              }}
+            >
               + Add transaction
             </button>
             <button onClick={() => pageDraft.navigate("SignOut")}>
@@ -917,221 +963,71 @@ export default function Workspace() {
                 yet.
               </p>
             )}
-            <section className="card">
-              <h2>{edit ? "Edit transaction" : "Add deposit or expense"}</h2>
-              <p>
-                Choose Expense, Income or Refund and enter the amount normally.
-                The entry type sets its direction, including split amounts. Card
-                payments belong in Transfer. Blank splits remain uncategorized.
-              </p>
-              <p>
-                Today is {currentDay} in {state.settings.timezone}. Use today or
-                an earlier date. Pending means already paid, but not yet cleared
-                by your bank.
-              </p>
-              <form
-                data-financial="true"
-                data-draft-form="transaction"
-                key={edit?.id || "new"}
-                data-editing-id={edit?.id}
-                data-editing-kind="transaction"
-                onSubmit={(e) =>
-                  submit(e, (f) => {
-                    const flow = str(f, "flow");
-                    const amount = entryAmount(str(f, "amount"), flow);
-                    const splits = Array.from(f.keys())
-                      .filter(
-                        (key) => key.startsWith("category-") && str(f, key),
+            <nav className="actions ledger-actions" aria-label="Ledger actions">
+              <button
+                type="button"
+                onClick={() => openLedgerForm("transaction")}
+                disabled={!accounts.length}
+              >
+                Add entry
+              </button>
+              <button
+                type="button"
+                disabled={
+                  !selectedLedgerRow || !!selectedLedgerRow.reconciledAt || busy
+                }
+                onClick={() =>
+                  selectedLedgerRow && editLedgerRow(selectedLedgerRow)
+                }
+              >
+                Edit selected
+              </button>
+              <button
+                type="button"
+                onClick={() => openLedgerForm("transfer")}
+                disabled={accounts.length < 2}
+              >
+                Transfer / card payment
+              </button>
+            </nav>
+            <section
+              className="ledger-account-strip"
+              aria-label="Account balances"
+            >
+              {accounts
+                .filter((a) => !accountFilter || a.id === accountFilter)
+                .map((a) => (
+                  <article className="card" key={a.id}>
+                    <h2>{a.name}</h2>
+                    <strong>
+                      {money(balance(a, transactions))}
+                      {liability(a) ? " owed" : ""}
+                    </strong>
+                    <p>
+                      Cleared balance ·{" "}
+                      {
+                        transactions.filter(
+                          (t) => t.accountId === a.id && t.status === "pending",
+                        ).length
+                      }{" "}
+                      pending
+                    </p>
+                    <small>
+                      Starting balance: {money(a.opening)} on {a.asOf} (
+                      {a.openingBasis === "start-of-day"
+                        ? "before that day’s entries"
+                        : "after that day’s entries"}
                       )
-                      .map((key) => ({
-                        categoryId: str(f, key),
-                        amount: entryAmount(
-                          str(f, `splitAmount-${key.split("-")[1]}`),
-                          flow,
-                        ),
-                      }));
-                    return {
-                      kind: edit ? "editTransaction" : "transaction",
-                      ...(edit ? { id: edit.id } : {}),
-                      accountId: str(f, "accountId"),
-                      date: str(f, "date"),
-                      description: str(f, "description"),
-                      amount,
-                      status: str(f, "status") as "pending" | "cleared",
-                      splits,
-                      flow:
-                        str(f, "flow") === "auto"
-                          ? undefined
-                          : (str(f, "flow") as "income" | "expense" | "refund"),
-                      occurrence: occurrenceInput(f) || null,
-                    } as Operation;
-                  })
-                }
-              >
-                <div className="fields">
-                  <AccountSelect
-                    accounts={accounts}
-                    name="accountId"
-                    value={edit?.accountId}
-                  />
-                  <Input
-                    label="Date"
-                    name="date"
-                    type="date"
-                    value={edit?.date || today()}
-                  />
-                  <LabelEntry
-                    label="Description"
-                    name="description"
-                    value={edit?.description}
-                    existing={state.transactions.map((t) => t.description)}
-                  />
-                  <Input
-                    label="Signed amount ($)"
-                    name="amount"
-                    value={edit ? dollars(edit.amount) : undefined}
-                  />
-                  <Field label="Status">
-                    <select
-                      name="status"
-                      defaultValue={edit?.status || "cleared"}
-                    >
-                      <option value="cleared">Cleared</option>
-                      <option value="pending">Pending</option>
-                    </select>
-                  </Field>
-                </div>
-                <Field label="Entry type">
-                  <select name="flow" defaultValue={edit?.flow || "auto"}>
-                    <option value="auto">
-                      Use amount direction (negative expense, positive income)
-                    </option>
-                    <option value="expense">Expense / card purchase</option>
-                    <option value="income">Income / deposit</option>
-                    <option value="refund">Refund of spending</option>
-                  </select>
-                </Field>
-                <SplitFields
-                  state={entryState}
-                  edit={edit}
-                  busy={busy}
-                  onCreateCategory={(name) =>
-                    void run(() => prepare({ kind: "category", name }))
-                  }
-                />
-                <OccurrenceFields
-                  state={state}
-                  current={edit?.occurrence}
-                  today={today()}
-                />
-                <div className="actions">
-                  <button
-                    data-support-action="prepare-transaction"
-                    disabled={busy || !accounts.length}
-                    className="primary"
-                  >
-                    Prepare transaction for review
-                  </button>
-                  {edit && (
-                    <button type="button" onClick={() => setEdit(null)}>
-                      Cancel edit
-                    </button>
-                  )}
-                </div>
-              </form>
+                    </small>
+                  </article>
+                ))}
             </section>
-            <section className="card">
-              <h2>Transfer / card payment</h2>
+            <section className="card" id="ledger-register">
+              <h2>Transactions</h2>
               <p>
-                A paired internal transfer moves value between your accounts. It
-                creates no new income or spending.
+                Select a row to edit it, or use its Edit button. Only confirmed
+                changes appear here.
               </p>
-              <form
-                data-financial="true"
-                data-draft-form="transfer"
-                key={transferEdit?.transferId || "new-transfer"}
-                data-editing-id={transferEdit?.id}
-                data-editing-kind="transfer"
-                onSubmit={(e) =>
-                  submit(e, (f) => {
-                    const kind = transferEdit ? "editTransfer" : "transfer";
-                    const editingId = transferEdit?.id;
-                    setTransferEdit(null);
-                    return {
-                      kind,
-                      ...(editingId ? { id: editingId } : {}),
-                      fromId: str(f, "fromId"),
-                      toId: str(f, "toId"),
-                      amount: parseMoney(str(f, "amount")),
-                      date: str(f, "date"),
-                      description: str(f, "description"),
-                      status: str(f, "status") as "cleared" | "pending",
-                      occurrence: occurrenceInput(f, "transferBill") || null,
-                    } as Operation;
-                  })
-                }
-              >
-                <div className="fields">
-                  <AccountSelect
-                    accounts={accounts}
-                    name="fromId"
-                    label="From account"
-                    value={pairFrom?.accountId}
-                  />
-                  <AccountSelect
-                    accounts={accounts}
-                    name="toId"
-                    label="To account (card for payment)"
-                    value={pairTo?.accountId}
-                  />
-                  <Input
-                    label="Transfer amount ($, positive)"
-                    name="amount"
-                    value={pairFrom ? dollars(-pairFrom.amount) : undefined}
-                  />
-                  <Input
-                    label="Transfer description"
-                    name="description"
-                    value={pairFrom?.description}
-                  />
-                  <Input
-                    label="Transfer date"
-                    name="date"
-                    type="date"
-                    value={pairFrom?.date || today()}
-                  />
-                  <Field label="Transfer status">
-                    <select
-                      name="status"
-                      defaultValue={pairFrom?.status || "cleared"}
-                    >
-                      <option value="cleared">Cleared</option>
-                      <option value="pending">Pending</option>
-                    </select>
-                  </Field>
-                </div>
-                <OccurrenceFields
-                  state={state}
-                  prefix="transferBill"
-                  current={pairFrom?.occurrence}
-                  today={today()}
-                />
-                <div className="actions">
-                  {transferEdit && (
-                    <button type="button" onClick={() => setTransferEdit(null)}>
-                      Cancel pair edit
-                    </button>
-                  )}
-                  <button disabled={busy || accounts.length < 2}>
-                    {transferEdit
-                      ? "Prepare paired transfer changes"
-                      : "Prepare paired transfer"}
-                  </button>
-                </div>
-              </form>
-            </section>
-            <section className="card">
-              <h2>Actual ledger</h2>
               <div className="fields">
                 <Field label="Filter account">
                   <select
@@ -1171,117 +1067,378 @@ export default function Workspace() {
                 </Field>
               </div>
               <div className="table-wrap">
-                <table>
+                <table role="table">
                   <caption className="visually-hidden">
-                    Transactions with per-account end-of-day cleared running
-                    balances
+                    Transactions and per-account cleared running balances
                   </caption>
                   <thead>
-                    <tr>
+                    <tr role="row">
                       {[
+                        "Select",
                         "Date",
                         "Account / description",
+                        "Categories / splits",
                         "Amount",
                         "Status",
                         "Cleared running balance",
                         "Actions",
                       ].map((v) => (
-                        <th key={v} scope="col">
+                        <th role="columnheader" key={v} scope="col">
                           {v}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions
-                      .filter(
-                        (t) =>
-                          (!accountFilter || t.accountId === accountFilter) &&
-                          (!statusFilter || t.status === statusFilter) &&
-                          t.description
-                            .toLowerCase()
-                            .includes(query.toLowerCase()) &&
-                          (!monthFilter || t.date.startsWith(monthFilter)),
-                      )
-                      .map((t) => {
-                        const a = accounts.find((a) => a.id === t.accountId)!;
-                        return (
-                          <tr key={t.id}>
-                            <td>{t.date}</td>
-                            <td>
-                              {a.name}
-                              <br />
-                              {t.description}
-                              {t.transferId && (
-                                <>
-                                  <br />
-                                  <span className="pill">
-                                    Paired transfer · no spending
-                                  </span>
-                                </>
+                    {visibleTransactions.map((t) => {
+                      const a = accounts.find((a) => a.id === t.accountId)!;
+                      return (
+                        <tr role="row" key={t.id}>
+                          <td role="cell" data-label="Select">
+                            <input
+                              type="radio"
+                              name="selectedTransaction"
+                              aria-label={`Select transaction ${t.date} ${t.description}`}
+                              checked={selectedTransaction === t.id}
+                              onChange={() => setSelectedTransaction(t.id)}
+                            />
+                          </td>
+                          <td role="cell" data-label="Date">
+                            {t.date}
+                          </td>
+                          <td role="cell" data-label="Account / description">
+                            {a.name}
+                            <br />
+                            {t.description}
+                            {t.transferId && (
+                              <>
+                                <br />
+                                <span className="pill">
+                                  {t.amount < 0 ? "To " : "From "}
+                                  {accounts.find(
+                                    (other) =>
+                                      other.id ===
+                                      transactions.find(
+                                        (pair) =>
+                                          pair.transferId === t.transferId &&
+                                          pair.id !== t.id,
+                                      )?.accountId,
+                                  )?.name || "linked account"}{" "}
+                                  · transfer, no spending
+                                </span>
+                              </>
+                            )}
+                          </td>
+                          <td role="cell" data-label="Categories / splits">
+                            {t.splits.length
+                              ? t.splits.map((split) => (
+                                  <div key={split.categoryId}>
+                                    {state.categories.find(
+                                      (c) => c.id === split.categoryId,
+                                    )?.name || "Uncategorized"}
+                                    : {money(split.amount)}
+                                  </div>
+                                ))
+                              : t.transferId
+                                ? "Transfer"
+                                : "Uncategorized"}
+                          </td>
+                          <td
+                            role="cell"
+                            data-label="Amount"
+                            className={t.amount < 0 ? "negative" : "positive"}
+                          >
+                            {money(t.amount)}
+                          </td>
+                          <td role="cell" data-label="Status">
+                            {t.status}
+                            {t.reconciledAt && " · reconciled"}
+                          </td>
+                          <td role="cell" data-label="Cleared running balance">
+                            {money(running.get(t.id) ?? null)}
+                            {liability(a) && " owed"}
+                          </td>
+                          <td role="cell" data-label="Actions">
+                            <div className="actions">
+                              {!t.reconciledAt && (
+                                <button onClick={() => editLedgerRow(t)}>
+                                  Edit
+                                </button>
                               )}
-                            </td>
-                            <td
-                              className={t.amount < 0 ? "negative" : "positive"}
-                            >
-                              {money(t.amount)}
-                            </td>
-                            <td>
-                              {t.status}
-                              {t.reconciledAt && " · reconciled"}
-                            </td>
-                            <td>
-                              {money(running.get(t.id) ?? null)}
-                              {liability(a) && " owed"}
-                            </td>
-                            <td>
-                              <div className="actions">
-                                {!t.transferId && !t.reconciledAt && (
-                                  <button
-                                    onClick={() => {
-                                      setEdit(t);
-                                      window.scrollTo({
-                                        top: 0,
-                                        behavior: "instant",
-                                      });
-                                    }}
-                                  >
-                                    Edit
-                                  </button>
-                                )}
-                                {!t.reconciledAt && (
-                                  <button
-                                    className="danger"
-                                    disabled={busy}
-                                    onClick={() =>
-                                      void run(() =>
-                                        prepare({
-                                          kind: "deleteTransaction",
-                                          id: t.id,
-                                        }),
-                                      )
-                                    }
-                                  >
-                                    Review delete{t.transferId ? " pair" : ""}
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                              {!t.reconciledAt && (
+                                <button
+                                  className="danger"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void run(() =>
+                                      prepare({
+                                        kind: "deleteTransaction",
+                                        id: t.id,
+                                      }),
+                                    )
+                                  }
+                                >
+                                  Review delete{t.transferId ? " pair" : ""}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
               {!transactions.length && (
                 <p>No ledger entries yet. Nothing has been posted.</p>
               )}
+              {!visibleTransactions.length && transactions.length > 0 && (
+                <p>No transactions match these filters.</p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountFilter("");
+                  setStatusFilter("");
+                  setQuery("");
+                  setMonthFilter("");
+                }}
+              >
+                Clear ledger filters
+              </button>
               <small>
-                Balances include all cleared entries through each day, including
-                rows hidden by filters. Pending entries do not alter cleared
-                balances.
+                Running balances include earlier cleared entries in each
+                account, including rows hidden by filters. Pending entries do
+                not alter cleared balances.
               </small>
             </section>
+            <details
+              className="card ledger-editor"
+              id="ledger-transaction-editor"
+            >
+              <summary>Add or edit a transaction</summary>
+              <section>
+                <h2>{edit ? "Edit transaction" : "Add deposit or expense"}</h2>
+                <p>
+                  Choose Expense, Income or Refund and enter the amount
+                  normally. The entry type sets its direction, including split
+                  amounts. Card payments belong in Transfer. Blank splits remain
+                  uncategorized.
+                </p>
+                <p>
+                  Today is {currentDay} in {state.settings.timezone}. Use today
+                  or an earlier date. Pending means already paid, but not yet
+                  cleared by your bank.
+                </p>
+                <form
+                  data-financial="true"
+                  data-draft-form="transaction"
+                  key={edit?.id || "new"}
+                  data-editing-id={edit?.id}
+                  data-editing-kind="transaction"
+                  onSubmit={(e) =>
+                    submit(e, (f) => {
+                      const flow = str(f, "flow");
+                      const amount = entryAmount(str(f, "amount"), flow);
+                      const splits = Array.from(f.keys())
+                        .filter(
+                          (key) => key.startsWith("category-") && str(f, key),
+                        )
+                        .map((key) => ({
+                          categoryId: str(f, key),
+                          amount: entryAmount(
+                            str(f, `splitAmount-${key.split("-")[1]}`),
+                            flow,
+                          ),
+                        }));
+                      return {
+                        kind: edit ? "editTransaction" : "transaction",
+                        ...(edit ? { id: edit.id } : {}),
+                        accountId: str(f, "accountId"),
+                        date: str(f, "date"),
+                        description: str(f, "description"),
+                        amount,
+                        status: str(f, "status") as "pending" | "cleared",
+                        splits,
+                        flow:
+                          str(f, "flow") === "auto"
+                            ? undefined
+                            : (str(f, "flow") as
+                                "income" | "expense" | "refund"),
+                        occurrence: occurrenceInput(f) || null,
+                      } as Operation;
+                    })
+                  }
+                >
+                  <div className="fields">
+                    <AccountSelect
+                      accounts={accounts}
+                      name="accountId"
+                      value={edit?.accountId}
+                    />
+                    <Input
+                      label="Date"
+                      name="date"
+                      type="date"
+                      value={edit?.date || today()}
+                    />
+                    <LabelEntry
+                      label="Description"
+                      name="description"
+                      value={edit?.description}
+                      existing={state.transactions.map((t) => t.description)}
+                    />
+                    <Input
+                      label="Signed amount ($)"
+                      name="amount"
+                      value={edit ? dollars(edit.amount) : undefined}
+                    />
+                    <Field label="Status">
+                      <select
+                        name="status"
+                        defaultValue={edit?.status || "cleared"}
+                      >
+                        <option value="cleared">Cleared</option>
+                        <option value="pending">Pending</option>
+                      </select>
+                    </Field>
+                  </div>
+                  <Field label="Entry type">
+                    <select name="flow" defaultValue={edit?.flow || "auto"}>
+                      <option value="auto">
+                        Use amount direction (negative expense, positive income)
+                      </option>
+                      <option value="expense">Expense / card purchase</option>
+                      <option value="income">Income / deposit</option>
+                      <option value="refund">Refund of spending</option>
+                    </select>
+                  </Field>
+                  <SplitFields
+                    state={entryState}
+                    edit={edit}
+                    busy={busy}
+                    onCreateCategory={(name) =>
+                      void run(() => prepare({ kind: "category", name }))
+                    }
+                  />
+                  <OccurrenceFields
+                    state={state}
+                    current={edit?.occurrence}
+                    today={today()}
+                  />
+                  <div className="actions">
+                    <button
+                      data-support-action="prepare-transaction"
+                      disabled={busy || !accounts.length}
+                      className="primary"
+                    >
+                      Prepare transaction for review
+                    </button>
+                    {edit && (
+                      <button type="button" onClick={() => setEdit(null)}>
+                        Cancel edit
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </section>
+            </details>
+            <details className="card ledger-editor" id="ledger-transfer-editor">
+              <summary>Transfer or pay a credit card</summary>
+              <section>
+                <h2>Transfer / card payment</h2>
+                <p>
+                  A paired internal transfer moves value between your accounts.
+                  It creates no new income or spending.
+                </p>
+                <form
+                  data-financial="true"
+                  data-draft-form="transfer"
+                  key={transferEdit?.transferId || "new-transfer"}
+                  data-editing-id={transferEdit?.id}
+                  data-editing-kind="transfer"
+                  onSubmit={(e) =>
+                    submit(e, (f) => {
+                      const kind = transferEdit ? "editTransfer" : "transfer";
+                      const editingId = transferEdit?.id;
+                      setTransferEdit(null);
+                      return {
+                        kind,
+                        ...(editingId ? { id: editingId } : {}),
+                        fromId: str(f, "fromId"),
+                        toId: str(f, "toId"),
+                        amount: parseMoney(str(f, "amount")),
+                        date: str(f, "date"),
+                        description: str(f, "description"),
+                        status: str(f, "status") as "cleared" | "pending",
+                        occurrence: occurrenceInput(f, "transferBill") || null,
+                      } as Operation;
+                    })
+                  }
+                >
+                  <div className="fields">
+                    <AccountSelect
+                      accounts={accounts}
+                      name="fromId"
+                      label="From account"
+                      value={pairFrom?.accountId}
+                    />
+                    <AccountSelect
+                      accounts={accounts}
+                      name="toId"
+                      label="To account (card for payment)"
+                      value={pairTo?.accountId}
+                    />
+                    <Input
+                      label="Transfer amount ($, positive)"
+                      name="amount"
+                      value={pairFrom ? dollars(-pairFrom.amount) : undefined}
+                    />
+                    <Input
+                      label="Transfer description"
+                      name="description"
+                      value={pairFrom?.description}
+                    />
+                    <Input
+                      label="Transfer date"
+                      name="date"
+                      type="date"
+                      value={pairFrom?.date || today()}
+                    />
+                    <Field label="Transfer status">
+                      <select
+                        name="status"
+                        defaultValue={pairFrom?.status || "cleared"}
+                      >
+                        <option value="cleared">Cleared</option>
+                        <option value="pending">Pending</option>
+                      </select>
+                    </Field>
+                  </div>
+                  <OccurrenceFields
+                    state={state}
+                    prefix="transferBill"
+                    current={pairFrom?.occurrence}
+                    today={today()}
+                  />
+                  <div className="actions">
+                    {transferEdit && (
+                      <button
+                        type="button"
+                        onClick={() => setTransferEdit(null)}
+                      >
+                        Cancel pair edit
+                      </button>
+                    )}
+                    <button disabled={busy || accounts.length < 2}>
+                      {transferEdit
+                        ? "Prepare paired transfer changes"
+                        : "Prepare paired transfer"}
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </details>
           </>
         )}
         {tab === "Budget" && (

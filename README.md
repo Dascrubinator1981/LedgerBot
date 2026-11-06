@@ -87,3 +87,5 @@ Latest usability follow-up: [changes and remaining stages](docs/UX_REVIEW_AND_NE
 Current staged behavior and executed validation: [November 6 update](docs/TODAY_UPDATE_REPORT.md). Full coverage and unfinished requirements: [requirements audit](docs/REQUIREMENTS_AUDIT.md). Safe local update: [Windows instructions](docs/UPDATE_WINDOWS_COPY.md).
 
 To record a reproducible issue without private financial values, see [Troubleshooting](docs/TROUBLESHOOTING.md). Shared-household approvals remain [planned](docs/HOUSEHOLD_APPROVAL_PLAN.md), not implemented.
+
+The Ledger now opens on its transaction register. See the [Ledger update and test-account logging walkthrough](docs/LEDGER_REGISTER_REPORT.md).

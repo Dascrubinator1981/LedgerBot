@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { savedPageFlow } from "./helpers/saved-page-flow";
 import { openReview } from "./helpers/open-review";
 import { ownerFeedbackFlow } from "./helpers/owner-feedback-flow";
@@ -60,6 +61,7 @@ test("two users, empty start, reviewed account, expense, reload, and isolation",
   expect((await uncommitted.json()).accounts).toHaveLength(0);
   await approve(page);
   await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await page.getByRole("button", { name: "Add entry", exact: true }).click();
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Fictional pocket · checking" });
@@ -76,7 +78,10 @@ test("two users, empty start, reviewed account, expense, reload, and isolation",
   await page.reload();
   await page.getByRole("link", { name: "Ledger", exact: true }).click();
   await expect(
-    page.getByRole("cell", { name: /Fictional snack/ }),
+    page.getByRole("cell", {
+      name: "Fictional pocket Fictional snack",
+      exact: true,
+    }),
   ).toBeVisible();
   const other = await browser.newContext();
   const bob = await other.newPage();
@@ -283,6 +288,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
     await approve(page);
   }
   await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await page.getByRole("button", { name: "Add entry", exact: true }).click();
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Synthetic card · credit" });
@@ -308,6 +314,9 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
     .getByRole("button", { name: "Prepare transaction for review" })
     .click();
   await approve(page);
+  await page
+    .getByRole("button", { name: "Transfer / card payment", exact: true })
+    .click();
   for (const [destination, amount] of [
     ["Synthetic card · credit", "30"],
     ["Synthetic savings · savings", "25"],
@@ -326,6 +335,23 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
     await page.getByRole("button", { name: "Prepare paired transfer" }).click();
     await approve(page);
   }
+  const pairedRow = page
+    .locator("#ledger-register tbody tr")
+    .filter({ has: page.getByRole("cell", { name: "-$30.00", exact: true }) });
+  await pairedRow.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(page.getByLabel("Transfer amount ($, positive)")).toHaveValue(
+    "30.00",
+  );
+  await expect(
+    page.getByLabel("From account", { exact: true }).locator("option:checked"),
+  ).toHaveText("Synthetic checking · checking");
+  await page
+    .getByRole("button", {
+      name: "Prepare paired transfer changes",
+      exact: true,
+    })
+    .click();
+  await approve(page);
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
   for (const [name, amount] of [
     ["Synthetic checking", "$945.00"],
@@ -505,4 +531,119 @@ test("custom quick actions move only their strip and held swipes do not navigate
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+});
+
+test("Ledger opens as a register with compact editors, selected-row editing and mobile rows", async ({
+  page,
+}) => {
+  await signup(page);
+  await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await page
+    .getByLabel("Account name", { exact: true })
+    .fill("Synthetic register pocket");
+  await page
+    .getByLabel("Opening balance ($, positive owed for liabilities)")
+    .fill("1000");
+  const today = await page.getByLabel("Opening as-of date").inputValue();
+  await page
+    .getByRole("button", { name: "Prepare account for review" })
+    .click();
+  await approve(page);
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  const register = page.locator("#ledger-register"),
+    editor = page.locator("#ledger-transaction-editor");
+  await expect(
+    register.getByRole("heading", { name: "Transactions", exact: true }),
+  ).toBeVisible();
+  await expect(editor).not.toHaveAttribute("open", "");
+  await expect(
+    page.getByLabel("Description", { exact: true }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Account balances" }),
+  ).toContainText("$1,000.00");
+  expect(
+    await register.evaluate(
+      (element) =>
+        !!(
+          element.compareDocumentPosition(
+            document.getElementById("ledger-transaction-editor")!,
+          ) & Node.DOCUMENT_POSITION_FOLLOWING
+        ),
+    ),
+  ).toBe(true);
+  await page.getByRole("button", { name: "Add entry", exact: true }).click();
+  await page
+    .getByLabel("Account", { exact: true })
+    .selectOption({ label: "Synthetic register pocket · checking" });
+  await page
+    .getByLabel("Description", { exact: true })
+    .fill("Synthetic register purchase");
+  await page.getByLabel("Date", { exact: true }).fill(today);
+  await page.getByLabel("Entry type", { exact: true }).selectOption("expense");
+  await page.getByLabel("Signed amount ($)", { exact: true }).fill("185");
+  await page
+    .getByRole("button", { name: "Prepare transaction for review" })
+    .click();
+  await expect(register).not.toContainText("Synthetic register purchase");
+  await approve(page);
+  await expect(
+    register.getByRole("cell", { name: "$815.00", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await expect(
+    page.getByLabel("Description", { exact: true }),
+  ).not.toBeVisible();
+  await register
+    .getByRole("radio", {
+      name: /Select transaction.*Synthetic register purchase/,
+    })
+    .check();
+  await page
+    .getByRole("button", { name: "Edit selected", exact: true })
+    .click();
+  await expect(page.getByLabel("Description", { exact: true })).toHaveValue(
+    "Synthetic register purchase",
+  );
+  await page.getByLabel("Signed amount ($)", { exact: true }).fill("190");
+  await page
+    .getByRole("button", { name: "Prepare transaction for review" })
+    .click();
+  await approve(page);
+  await expect(
+    register.getByRole("cell", { name: "$810.00", exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Search description").fill("not-a-match");
+  await expect(register).toContainText("No transactions match these filters");
+  await expect(
+    page.getByRole("region", { name: "Account balances" }),
+  ).toContainText("$810.00");
+  await page.getByRole("button", { name: "Clear ledger filters" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    register.getByRole("cell", {
+      name: "Synthetic register pocket Synthetic register purchase",
+    }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  const data = await (await page.request.get("/api/state")).json();
+  expect(data.transactions).toHaveLength(1);
+  expect(data.transactions[0].amount).toBe(-19000);
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+  await page
+    .getByRole("button", { name: "+ Add transaction", exact: true })
+    .click();
+  await expect(page.getByLabel("Description", { exact: true })).toBeVisible();
 });
