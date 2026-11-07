@@ -1,0 +1,68 @@
+name: Validate manual foundation
+on:
+  pull_request:
+  push:
+    branches: [main, "feat/**"]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run check:secrets
+      - run: npm run db:migrate
+      - run: npm run db:migrate
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      # Test the compiled build before next dev replaces the shared .next output.
+      - run: npm run test:e2e:production
+      - run: npm run test:e2e
+      - run: npm audit --omit=dev
+      # Include development-tool advisories in the release gate.
+      - run: npm audit
+  postgres-and-verified-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run local:services
+      - run: npm run test:postgres
+      - run: npm run test:recovery
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:postgres
+  production-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run test:container
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: container-security-report
+          path: data/container-qa/latest-*.json
+          if-no-files-found: warn

@@ -1,0 +1,12 @@
+node_modules/
+.next/
+data/
+*.sqlite*
+.env*
+!.env.example
+playwright-report/
+test-results/
+tsconfig.tsbuildinfo
+coverage/
+next-env.d.ts
+*.draft-key
