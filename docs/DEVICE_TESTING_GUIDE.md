@@ -8,9 +8,9 @@ Automated tests exercise real application flows, SQL permissions, exact cents, b
 
 Windows local testing is available now. **An iPhone/Steam Deck test against the same private HTTPS beta address is pending: no beta site has been deployed.** Do not substitute your own bank website, a public development tunnel or a guessed address. A future private beta needs a separately approved deployment and verified configuration. The text `BETA_URL` below is a placeholder, not a working link.
 
-## Follow-up usability changes
+## Latest owner test books
 
-The updated review branch puts the automatic Forecaster on Dashboard and its display settings/recurring plan controls in Settings. Weekly/biweekly/quarterly budgets and page-wide deferred review are still pending. With an explicit Expense choice, positive total and split amounts are accepted and reviewed as outflows; automatic direction still uses signed amounts. Use a fictional opening snapshot dated yesterday for today's purchases. Update by stopping the local dev server, pulling the review branch, running `npm ci` and `npm run db:migrate`, then restarting `npm run dev`. Do not delete the local database to update.
+The current, extensive per-section laptop and iPhone walkthroughs are in [owner-testing/START_HERE.md](owner-testing/START_HERE.md), with a private findings template. Use those books for the latest same-day/manual-entry rules, weekly/biweekly/quarterly budgets, saved-page reviews, current labels and exact fixture checkpoints. The shorter scenarios below are older reference checks. Do not combine their dollar amounts with the new books' fixtures. No private HTTPS beta has been supplied; iPhone access remains a prerequisite. Fictional .test addresses cannot receive email verification or recovery messages.
 
 ## Part 1 — prepare the Windows laptop, one small step at a time
 
