@@ -1,6 +1,6 @@
 # LedgerBot laptop test book
 
-Candidate: review branch `feat/manual-finance-foundation`, app fixes at `6c6043a` or a later version that includes them. This is a development candidate, not a released service. Guide prepared November 6, 2026 (owner's local date).
+Candidate: review branch `feat/manual-finance-foundation`, app fixes at `6c6043a` or a later version that includes them. This is a development candidate, not a released service. Guide prepared November 6, 2026; updated November 12 for recurring-schedule edit/cancel checks. Pull the latest review branch before these checks.
 
 Use this beside OWNER_FINDINGS_TEMPLATE.md. Work one section at a time. Record PASS, ISSUE, BLOCKED, NOT TRIED or SUGGESTION. A blocked feature is not a pass. You do not need to diagnose code. Copy the step ID when reporting: for example, `L-LEDGER-C / Step 3`.
 
@@ -200,6 +200,8 @@ Return to the MAIN laptop user. Check baseline: Checking $955, Savings $25, card
 - Step 6. On the $20 bill enter a $5 linked Cleared expense, uncheck settles in full. Expect $5 actual, an outstanding/partial state, not a fully paid $20. Enter the remaining $15 linked to the SAME occurrence and settle; total actual must be $20 once, not $40.
 - Step 7. Inspect available occurrence controls (expected amount/date, status, skip, cancel, reopen or unlink if shown). Exercise each on a separate disposable occurrence through review; record actual labels and results. None should create a second cash transaction merely by changing its planning status.
 - Step 8. Try assigning the wrong account or a nonexistent cadence date through the visible controls. Expect rejection or a clear review, not a silent false bill match. Amount/name similarity alone must not auto-link bills.
+- Step 9. Edit an approved schedule, enter signed amount 0 and click Prepare schedule changes. Expect rejection, the same Edit recurring plan heading and your entered 0 still present. Click Cancel schedule edit, then navigate away: no false unfinished warning and no changed schedule.
+- Step 10. Edit that schedule again with a valid amount, Prepare, then Edit change 1 in the page review. Prepare the restored form and confirm. It must update the SAME schedule, not add another one; existing transactions and cash must remain unchanged. If a draft saved on an older version says its target is missing, discard that incomplete edit and choose Edit schedule on the intended approved schedule again; do not recreate a second bill.
 
 ## L-FORECAST-A — Automatic overview and cross-check
 

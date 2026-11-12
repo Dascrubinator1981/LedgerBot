@@ -39,6 +39,8 @@ Copy this file once per device. Duplicate the section block for each guide secti
 - Was it prepared only, saved for later or confirmed?
 - Did a saved receipt appear? Yes / No / Unsure
 - Did Ledger show the entry once, twice or not at all?
+- For schedule edits: did the edit form retain inputs after rejection, cancel without a false warning, and update the original schedule instead of duplicating it?
+- Guide revision: original November 6 / updated November 12 / later:
 - Repeats: every time / sometimes / once / not retried
 - Reload attempted? Yes / No — download recording FIRST
 - Screenshot filename, checked for sensitive information:

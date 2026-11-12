@@ -56,6 +56,55 @@ export async function correlationFlow(page: Page) {
     .getByRole("button", { name: "Prepare recurring assumption" })
     .click();
   await approve(page);
+  const schedule = page
+    .locator("article")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Correlation water bill",
+        exact: true,
+      }),
+    });
+  await schedule
+    .getByRole("button", { name: "Edit schedule", exact: true })
+    .click();
+  await page.getByLabel("Signed recurring amount ($)").fill("0");
+  await page
+    .getByRole("button", { name: "Prepare schedule changes", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Edit recurring plan", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Signed recurring amount ($)")).toHaveValue("0");
+  await page
+    .getByRole("button", { name: "Cancel schedule edit", exact: true })
+    .click();
+  await page.getByRole("link", { name: "Ledger", exact: true }).click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await page
+    .getByText("Manage forecast bills and income plans", { exact: true })
+    .click();
+  await schedule
+    .getByRole("button", { name: "Edit schedule", exact: true })
+    .click();
+  await page.getByLabel("Signed recurring amount ($)").fill("-100");
+  await page
+    .getByRole("button", { name: "Prepare schedule changes", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Edit change 1", exact: true })
+    .click();
+  await expect(page.getByLabel("Signed recurring amount ($)")).toHaveValue(
+    "-100",
+  );
+  // Restored form retains schedule identity; it must edit rather than create a duplicate.
+  await page
+    .locator('form[data-draft-form="recurrence"] button:not([type="button"])')
+    .click();
+  await approve(page);
+  const afterEdit = await (await page.request.get("/api/state")).json();
+  expect(afterEdit.recurrences).toHaveLength(1);
+  expect(afterEdit.transactions).toHaveLength(0);
   await page.getByRole("link", { name: "Ledger", exact: true }).click();
   await page.getByRole("button", { name: "Add entry", exact: true }).click();
   async function enter(description: string, amount: string, link: boolean) {

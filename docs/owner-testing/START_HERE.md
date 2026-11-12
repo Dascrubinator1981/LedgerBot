@@ -12,3 +12,7 @@ The downloadable pack also contains index.html. Double-click it to read the guid
 These guides are a source-checked manual test plan, not a claim that every step has been executed on your physical devices. Use only invented financial records. A real login email does not make the app ready for real money.
 
 The current source repository was last reported public. Keep personal findings, screenshots, exports and logs OUTSIDE it. No user-facing account deletion, JSON import, live bank/OCR/OpenAI integration or deployed beta has been promised by this pack.
+
+## November 12 update
+
+The recurring bill editor now retains inputs and editing context after a rejected preparation. Cancel schedule edit clears its unfinished-form warning. Editing a staged schedule retains its original schedule identity. New checks: laptop L-BILLS-B Steps 9–10 and phone P-BILLS-A Steps 7–8; the findings template now includes schedule-specific results. Main financial fixture totals are unchanged. Pull the latest review branch before testing these fixes. Hosted Supabase management access is still not configured here; a GitHub login/repository connection alone does not supply it.

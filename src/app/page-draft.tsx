@@ -112,12 +112,27 @@ export function usePageDraft({
       const key = (form: HTMLFormElement) =>
         form.dataset.draftForm ||
         form.querySelector("button:not([type=button])")?.textContent?.trim();
+      const legacySchedule =
+        restore.formKey === "Prepare recurring assumption" ||
+        restore.formKey === "Prepare schedule changes";
       const form = restore.formKey
-        ? forms.find((form) => key(form) === restore.formKey)
+        ? forms.find(
+            (form) =>
+              key(form) === (legacySchedule ? "recurrence" : restore.formKey),
+          )
         : forms[restore.formIndex];
       if (!form) {
         if (attempts++ < 50) frame = requestAnimationFrame(applySnapshot);
         return;
+      }
+      if (legacySchedule) {
+        form.dataset.legacyScheduleEdit =
+          restore.formKey === "Prepare schedule changes" ? "true" : "false";
+        const operation = restore.replaces?.operation;
+        if (operation?.kind === "editRecurrence") {
+          const id = form.elements.namedItem("scheduleId");
+          if (id instanceof HTMLInputElement) id.value = operation.id;
+        }
       }
       const disclosure = form.closest("details");
       if (disclosure) disclosure.open = true;
@@ -523,6 +538,15 @@ export function usePageDraft({
                         ],
                       ] as [string, string][],
                     };
+                    if (item.operation.kind === "editRecurrence") {
+                      form.formKey = "recurrence";
+                      form.values = [
+                        ...form.values.filter(
+                          ([name]) => name !== "scheduleId",
+                        ),
+                        ["scheduleId", item.operation.id],
+                      ];
+                    }
                     editingRepair.current = {
                       index,
                       operation: item.operation,

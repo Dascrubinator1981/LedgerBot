@@ -394,6 +394,7 @@ export default function Workspace() {
   function submit(
     event: FormEvent<HTMLFormElement>,
     build: (f: FormData) => Operation,
+    onPrepared?: () => void,
   ) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -409,6 +410,7 @@ export default function Workspace() {
           "Finish adding the new category, or choose Keep working without adding, before preparing this entry.",
         );
       await pageDraft.add(build(fields), form);
+      onPrepared?.();
       if (form.dataset.draftForm === "transaction") setEdit(null);
       if (form.dataset.draftForm === "transfer") setTransferEdit(null);
       setNotice(
@@ -1738,6 +1740,10 @@ export default function Workspace() {
               today={today()}
               busy={busy}
               submit={submit}
+              cancelEdit={(form) => {
+                if (pageDraft.editingChange) pageDraft.cancelEditingChange();
+                else pageDraft.cancelForm(form);
+              }}
               prepare={(op) => void run(() => prepare(op))}
             />
           </>
@@ -1977,6 +1983,10 @@ export default function Workspace() {
                 today={today()}
                 busy={busy}
                 submit={submit}
+                cancelEdit={(form) => {
+                  if (pageDraft.editingChange) pageDraft.cancelEditingChange();
+                  else pageDraft.cancelForm(form);
+                }}
                 prepare={(op) => void run(() => prepare(op))}
               />
             </details>

@@ -133,6 +133,8 @@ Use TODAY shown in this app/time zone. Keep the main-flow entries within the sam
 - Step 4. Checking **$915**, spending **$250**, Utilities **$40**. Current occurrence must not be projected twice.
 - Step 5. Last seven days' paid bills should contain this payment, not ordinary market shopping. Check on narrow portrait screen and landscape.
 - Step 6. For pause/resume/archive, partial payments, matching an existing entry, occurrence changes and schedule invalid inputs use a separate phone sandbox user and laptop L-BILLS-B. Tap the same named controls. Record any touch-only failures separately. These experiments would change projections, so keep them off the main checkpoint.
+- Step 7. In the phone sandbox, edit an approved schedule, enter signed amount 0, tap Prepare schedule changes. Expect an error with editing context and entered amount retained. Cancel schedule edit, navigate away and back: no false unfinished warning or changed schedule.
+- Step 8. Prepare a valid edit to that schedule, edit the staged item, then prepare and confirm again. Expect one updated schedule, no duplicate, no cash transaction. An older incomplete saved edit with no target must ask you to discard/reselect Edit schedule rather than silently add a duplicate. Check keyboard dismissal and portrait/landscape do not change the outcome. These checks were added November 12; use the latest review-branch candidate.
 
 ## P-FORECAST-A — Overview and touch graphs
 

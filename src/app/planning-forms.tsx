@@ -14,6 +14,7 @@ import {
 export type SubmitFinance = (
   event: FormEvent<HTMLFormElement>,
   build: (data: FormData) => Operation,
+  onPrepared?: () => void,
 ) => void;
 const value = (f: FormData, name: string) => String(f.get(name) || "");
 export function occurrenceInput(f: FormData, prefix = "bill") {
@@ -114,12 +115,14 @@ export function PlanningPanel({
   busy,
   submit,
   prepare,
+  cancelEdit,
 }: {
   state: FinanceState;
   today: string;
   busy: boolean;
   submit: SubmitFinance;
   prepare: (op: Operation) => void;
+  cancelEdit: (form: HTMLFormElement | null) => void;
 }) {
   const [editing, setEditing] = useState<Recurrence | null>(null);
   const getRule = (f: FormData) => ({
@@ -145,18 +148,37 @@ export function PlanningPanel({
         </p>
         <form
           data-financial="true"
+          data-draft-form="recurrence"
+          onReset={(e) => {
+            delete e.currentTarget.dataset.legacyScheduleEdit;
+          }}
           key={editing?.id || "new-rule"}
-          onSubmit={(e) =>
-            submit(e, (f) => {
-              const fields = getRule(f);
-              const result: Operation = editing
-                ? { kind: "editRecurrence", id: editing.id, ...fields }
-                : { kind: "recurrence", ...fields };
-              setEditing(null);
-              return result;
-            })
-          }
+          onSubmit={(e) => {
+            const legacyEdit =
+              e.currentTarget.dataset.legacyScheduleEdit === "true";
+            submit(
+              e,
+              (f) => {
+                const fields = getRule(f);
+                const id = value(f, "scheduleId");
+                if (!id && legacyEdit)
+                  throw new Error(
+                    "This older saved schedule edit has no target. Discard it and choose Edit schedule on the intended schedule again.",
+                  );
+                return id
+                  ? { kind: "editRecurrence", id, ...fields }
+                  : { kind: "recurrence", ...fields };
+              },
+              () => setEditing(null),
+            );
+          }}
         >
+          <input
+            type="text"
+            hidden
+            name="scheduleId"
+            defaultValue={editing?.id || ""}
+          />
           <div className="fields">
             <AccountSelect
               accounts={state.accounts}
@@ -202,7 +224,14 @@ export function PlanningPanel({
                 : "Prepare recurring assumption"}
             </button>
             {editing && (
-              <button type="button" onClick={() => setEditing(null)}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={(event) => {
+                  cancelEdit(event.currentTarget.form);
+                  setEditing(null);
+                }}
+              >
                 Cancel schedule edit
               </button>
             )}
