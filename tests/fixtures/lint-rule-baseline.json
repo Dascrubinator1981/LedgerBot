@@ -1,0 +1,14 @@
+{
+  "src/app/workspace.tsx": {
+    "count": 113,
+    "sha256": "e809ea1c5cccec205e74738d64d3f93ea3e7577838c1f5664d6a4305cf1500b5"
+  },
+  "src/lib/domain.ts": {
+    "count": 113,
+    "sha256": "e809ea1c5cccec205e74738d64d3f93ea3e7577838c1f5664d6a4305cf1500b5"
+  },
+  "scripts/check-secrets.mjs": {
+    "count": 90,
+    "sha256": "0246ef4e5f4b0d1ee137b77289eef49c6e468f9b9f230866e1d48663e838a55a"
+  }
+}

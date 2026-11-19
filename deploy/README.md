@@ -1,0 +1,35 @@
+# Private-beta deployment proposal — not deployed
+
+This is the concrete configuration boundary for review. The user requested a November beta goal; no launch date is promised. No hosting/database account exists in the connected environment, and no deployment, subscription or paid resource has been activated. Local container validation is not a live beta.
+
+## Intended first candidate
+
+Closed, approved-test-user **manual finance with fictional records only**: Ledger, account/card transfers, reviewed changes, Budget/graphs/filtering, recurring assumptions/occurrence matching, Forecaster, undo/export and session controls. Calendar, full subscription management/cancellation, bank sync, live OpenAI Pip, OCR, billing and payments are outside this first candidate. Do not advertise them as enabled.
+
+The proposed boundary is a Node 24 application container behind a managed HTTPS ingress, with a separate Supabase PostgreSQL/Auth project, transactional email, external key storage and backups. The image is portable; a hosting provider, region and price still need selection/review. No price has been verified and no “free production hosting” promise is made. Staging must be separate from any eventual real-data production project.
+
+## Operator sequence after approval
+
+1. Review the exact source commit, local test/audit evidence, image scan and remaining gates. Get separate owner approval for the specific provider, region, cost limit and private staging deployment. Do not enable automatic deployments from an unreviewed branch.
+2. Create an isolated Supabase beta project under the owner's account. Review its current plan/terms/region first. No real financial data or development password hashes are imported. Apply the sorted PostgreSQL migrations with a separate migration administrator, then apply them again to verify repeatability. Preserve the expected schema version.
+3. Create a non-owner, non-superuser, non-RLS-bypass application login in `ledgerbot_server`. Its connection is server-only. Keep migration/rotation credentials separate and never put an administrator or service-role key in the application/browser configuration.
+4. Configure the provider to disable public signup, verify email and use exact HTTPS callback/recovery allow-lists. Production application routes/UI also close signup, but cannot disable Supabase's independent public Auth endpoints. Pre-create only approved test identities with designated mailboxes under a reviewed provider process. Activate them using the app's tested Forgot Password/PKCE flow; do not assume a different invite token format is supported. Prove unauthorized provider signup is denied before exposing the candidate.
+5. Configure SMTP/delivery, quotas, rate limits and sender/domain settings. Verify actual mail delivery with approved test mailboxes. Local mail capture is not production email. No mailbox credentials or verification links should appear in logs or chat.
+6. Generate a new versioned encryption key in an external secret manager, with a separately protected recovery copy. Do not reuse ignored development keys. Configure the values named in `staging.env.example` using secure runtime settings, not build arguments or a committed file. Test key recovery/rotation and retain keys required by backups.
+7. Build the Docker target from the reviewed commit and record its immutable image digest. The build context allow-list excludes databases, `.env` files, Git metadata, test artifacts and local secrets. In a managed proxy environment, mount the supplied CA as the `proxy_ca` BuildKit secret; otherwise normal TLS trust is used. Never disable TLS or artifact integrity checks.
+8. Run the non-root artifact with a read-only filesystem, dropped capabilities and no-new-privileges where the platform supports equivalent controls. Allow only bounded temporary/cache storage. Keep direct app ports private behind the HTTPS ingress; use the platform's supported trust/forwarding model. Do not expose the local developer server or forward a home-router port.
+9. Configure process liveness at `/api/health` and dependency readiness at `/api/health?ready=1`. Only readiness 200 should admit beta traffic. Generic 503 is expected for missing HTTPS/database/provider/versioned-key configuration. Verify secure cookies and non-cacheable HTML/API responses at the actual HTTPS edge. Configure body/time/rate limits and privacy-safe access logs without request bodies, credentials or query strings.
+10. Run the actual hosted smoke flow: approved identity → recovery/password setup → empty account → reviewed account/split expense/card payment → budget/forecast matching → undo/export → second isolated identity → session revocation. Test anonymous, expired, cross-owner and unapproved access as failures. Local passing tests do not replace this.
+11. Rehearse a hosted backup restore into a separate isolated project, including roles/RLS, provider identity continuity and all encryption keys. Establish recovery objectives with observed durations. Do not claim disaster recovery from a liveness check.
+12. Verify remote CI and the image/package vulnerability gates for the candidate commit. Resolve findings or complete a justified independent review; do not suppress them to get green checks. Then invite the owner to the physical-device guide. Do not create tester invitations or send mail to others without explicit instructions.
+13. Review device results, privacy/terms drafts, incident response and all remaining gates before any real-user-data beta. Obtain a separate explicit release decision. This proposal does not authorize customer deletion, bank connections or paid activation.
+
+## What the local rehearsal proves
+
+The candidate can be built and run locally without embedding credentials or financial databases. It runs as an unprivileged user, supports a read-only runtime and fails closed for unconfigured finance access. The application now has versioned draft keys, maintenance-only transactional rotation, fresh-session revocation and a production configuration guard. The package audit fix has rule-parity/parser regression coverage.
+
+A local HTTP loopback container does **not** prove managed HTTPS/proxy behavior, provider policy, SMTP delivery, hosted restore, physical Safari/Steam Deck behavior, legal compliance or independent penetration-test results. Keep those marked pending until executed.
+
+## Required owner participation
+
+The owner has said Supabase/hosting probably do not exist. No secret should be supplied in chat. Once the provider/cost proposal is approved, the necessary owner action is creating/authorizing the provider accounts and entering configuration through secure provider/environment settings. The agent cannot fabricate those accounts, consent to paid terms on the owner's behalf, or invent a working beta URL. Actual device checks then need the owner's hardware and observations. A guided account-creation session can be much simpler than installing a local development environment on every device.

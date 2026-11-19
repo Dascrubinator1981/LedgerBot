@@ -1,0 +1,9 @@
+node_modules
+.next
+data
+test-results
+playwright-report
+package-lock.json
+AGENTS.md
+CODEX_FIRST_TASK.md
+docs/LedgerBot_Codex_Master_Build_Prompt_v3.md
