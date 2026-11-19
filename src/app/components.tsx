@@ -15,6 +15,7 @@ import {
   type Proposal,
   type Transaction,
 } from "@/lib/domain";
+import { operationSummary } from "@/lib/operation-summary";
 import { CategorySelect } from "./category-select";
 export const dollars = (value: number) =>
   `${value < 0 ? "-" : ""}${Math.floor(Math.abs(value) / 100)}.${String(Math.abs(value) % 100).padStart(2, "0")}`;
@@ -71,15 +72,22 @@ export function AccountSelect({
   name,
   label = "Account",
   value,
+  onChange,
 }: {
   accounts: Account[];
+  onChange?: (id: string) => void;
   name: string;
   label?: string;
   value?: string;
 }) {
   return (
     <Field label={label}>
-      <select name={name} defaultValue={value} required>
+      <select
+        name={name}
+        defaultValue={value}
+        required
+        onChange={(e) => onChange?.(e.target.value)}
+      >
         <option value="">Choose account</option>
         {accounts.map((a) => (
           <option key={a.id} value={a.id}>
@@ -124,7 +132,7 @@ export function SplitFields({
             onCreate={onCreateCategory}
           />
           <Input
-            label={`Split ${i + 1} signed amount ($)`}
+            label={`Split ${i + 1} amount ($)`}
             name={`splitAmount-${i}`}
             required={false}
             value={edit?.splits[i] ? dollars(edit.splits[i].amount) : undefined}
@@ -145,27 +153,35 @@ export function SplitFields({
 }
 function Diff({ value, state }: { value: unknown; state: FinanceState }) {
   const labels: Record<string, string> = {
-    balanceImpact: "Starting-balance treatment",
-    fromBalanceImpact: "From account balance treatment",
-    toBalanceImpact: "To account balance treatment",
     kind: "Change",
     name: "Name",
     type: "Account type",
-    opening: "Opening balance",
-    asOf: "Opening snapshot date (end of day)",
+    opening: "Starting balance",
+    asOf: "Balance date",
+    date: "Date",
+    amount: "Amount",
+    status: "Status",
+    flow: "Entry type",
+    splits: "Categories",
+    month: "Month",
+    period: "Budget period",
+    cadence: "Frequency",
+    anchor: "Period start",
+    openingBasis: "Balance timing",
+    currency: "Currency",
+    occurrence: "Bill link",
+    settles: "Settles in full",
+    newCategory: "New category",
+    target: "Monthly target",
+    balanceImpact: "Starting-balance treatment",
+    fromBalanceImpact: "From account balance treatment",
+    toBalanceImpact: "To account balance treatment",
     accountId: "Account",
     fromId: "From account",
     toId: "To account",
     categoryId: "Category",
-    amount: "Signed amount",
-    date: "Date",
     description: "Description",
-    status: "Status",
-    splits: "Category allocations",
-    month: "Month",
-    target: "Monthly target",
     start: "First due date",
-    cadence: "Frequency",
     clearingDays: "Estimated clearing delay (days)",
     statement: "Statement ending balance",
     balance: "Cleared balance",
@@ -173,16 +189,12 @@ function Diff({ value, state }: { value: unknown; state: FinanceState }) {
     id: "Record ID",
     transferId: "Linked transfer ID",
     reconciledAt: "Reconciled through",
-    currency: "Currency",
     recurrenceId: "Bill / income schedule",
     dueDate: "Scheduled due date",
     expectedClearDate: "Estimated clearance date",
-    settles: "Confirms this occurrence is settled in full",
-    occurrence: "Bill / income link",
     transactionId: "Recorded payment",
     sourceProposalId: "Approved deletion to restore",
     entries: "Restored records",
-    flow: "Entry type",
     paused: "Pause future estimates",
     active: "Active future estimates",
     archived: "Archived schedule",
@@ -197,6 +209,12 @@ function Diff({ value, state }: { value: unknown; state: FinanceState }) {
       return key === "occurrence"
         ? "Not linked — ordinary transaction"
         : "Unknown / not set up";
+    if (typeof v === "boolean") return v ? "Yes" : "No";
+    if (key === "openingBasis")
+      return v === "start-of-day"
+        ? "Before that day’s entries"
+        : "Closing snapshot, includes that day";
+    if (key === "kind") return String(v).replace(/([A-Z])/g, " $1");
     if (typeof v === "boolean") return v ? "Yes" : "No";
     if (key === "recurrenceId")
       return state.recurrences.find((r) => r.id === v)?.name || String(v);
@@ -273,7 +291,8 @@ export function Review({
   onClose: () => void;
 }) {
   const operations =
-    data.proposal.operation.kind === "batch"
+    data.proposal.operation.kind === "batch" ||
+    data.proposal.operation.kind === "draft"
       ? data.proposal.operation.operations
       : [data.proposal.operation];
   const displayState = {
@@ -289,27 +308,35 @@ export function Review({
       ),
     ],
   };
-  const dialog = useRef<HTMLDialogElement>(null),
+  const dialog = useRef<HTMLElement>(null),
     track = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ pointer: number; start: number; width: number } | null>(
-    null,
-  );
+  const drag = useRef<{
+    pointer: number;
+    start: number;
+    width: number;
+    scale: number;
+  } | null>(null);
   const [position, setPosition] = useState(0),
     [stage, setStage] = useState(1),
     [slideHint, setSlideHint] = useState("");
   useEffect(() => {
     const element = dialog.current;
-    element?.showModal();
-    return () => element?.close();
+    element?.focus();
+    element?.scrollIntoView({ block: "start" });
   }, []);
   return (
-    <dialog
+    <section
       ref={dialog}
-      className="review"
+      role="dialog"
+      aria-modal="false"
+      tabIndex={-1}
+      className="review inline-review"
       aria-labelledby="review-title"
-      onCancel={(e) => {
-        e.preventDefault();
-        if (!busy) onClose();
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          if (!busy) onClose();
+        }
       }}
     >
       <h2 id="review-title">
@@ -323,58 +350,79 @@ export function Review({
         </p>
       )}
       <p className="notice">
-        Nothing saved yet.{" "}
+        Nothing saved yet. These changes will not take place until confirmed.
         {data.proposal.source === "ai"
-          ? "Pip prepared this proposal. Only you can approve it here."
-          : "You prepared this proposal."}{" "}
-        No money will move between financial institutions.
+          ? " Pip prepared this draft; only you can confirm."
+          : ""}
       </p>
-      <div className="diff">
-        <section>
-          <h3>Before</h3>
-          <Diff value={data.proposal.before} state={displayState} />
-        </section>
-        <section>
-          <h3>After / intended operation</h3>
-          <Diff value={data.proposal.operation} state={displayState} />
-        </section>
+      <div className="table-wrap review-table">
+        <table>
+          <caption>Changes you are approving</caption>
+          <thead>
+            <tr>
+              <th scope="col">Change</th>
+              <th scope="col">Exact entry</th>
+            </tr>
+          </thead>
+          <tbody>
+            {operations.map((op, index) => {
+              const summary = operationSummary(op, displayState);
+              return (
+                <tr key={index}>
+                  <td>{summary.title}</td>
+                  <td>
+                    {summary.detail}
+                    <details>
+                      <summary>Before and after details</summary>
+                      <div className="diff">
+                        <section>
+                          <h3>Before</h3>
+                          <Diff
+                            value={
+                              Array.isArray(data.proposal.before)
+                                ? data.proposal.before[index]
+                                : data.proposal.before
+                            }
+                            state={displayState}
+                          />
+                        </section>
+                        <section>
+                          <h3>After</h3>
+                          <Diff value={op} state={displayState} />
+                        </section>
+                      </div>
+                    </details>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
       {data.proposal.impact && (
-        <section>
-          <h3>Cleared balance impact</h3>
-          {data.proposal.impact.accounts.map((a, i) => (
-            <p key={i}>
-              {a.name}
-              {a.owed ? " (owed)" : ""}: {money(a.before)} → {money(a.after)}
-            </p>
-          ))}
-          <p>
-            Net worth: {money(data.proposal.impact.netWorthBefore)} →{" "}
-            {money(data.proposal.impact.netWorthAfter)}
-          </p>
-          <small>
-            Pending entries and plan changes do not immediately change cleared
-            balances. Recurring changes affect estimates only; category targets
-            compare against actuals without moving money.
-          </small>
-          {data.proposal.impact.plan && (
-            <p>
-              Budget {data.proposal.impact.plan.month}: cleared spending{" "}
-              {money(data.proposal.impact.plan.actualBefore)} →{" "}
-              {money(data.proposal.impact.plan.actualAfter)}; target{" "}
-              {money(data.proposal.impact.plan.targetBefore)} →{" "}
-              {money(data.proposal.impact.plan.targetAfter)}.
-            </p>
-          )}
-          {data.proposal.impact.projection && (
-            <p>
-              30-day estimated low cash as of{" "}
-              {data.proposal.impact.projection.asOf}:{" "}
-              {money(data.proposal.impact.projection.lowestBefore)} →{" "}
-              {money(data.proposal.impact.projection.lowestAfter)}. This is a
-              projection, not a cleared bank balance.
-            </p>
-          )}
+        <section aria-label="Changed balances">
+          <h3>Balance changes</h3>
+          {data.proposal.impact.accounts
+            .filter((a) => a.before !== a.after)
+            .map((a, i) => (
+              <p key={i}>
+                {a.name}
+                {a.owed ? " (owed)" : ""}: {money(a.before)} → {money(a.after)}
+              </p>
+            ))}
+          {data.proposal.impact.plan &&
+            (data.proposal.impact.plan.targetBefore !==
+              data.proposal.impact.plan.targetAfter ||
+              data.proposal.impact.plan.actualBefore !==
+                data.proposal.impact.plan.actualAfter) && (
+              <p>
+                Budget {data.proposal.impact.plan.month}: spending{" "}
+                {money(data.proposal.impact.plan.actualBefore)} →{" "}
+                {money(data.proposal.impact.plan.actualAfter)}; target{" "}
+                {money(data.proposal.impact.plan.targetBefore)} →{" "}
+                {money(data.proposal.impact.plan.targetAfter)}.
+              </p>
+            )}
         </section>
       )}
       {data.proposal.operation.kind === "deleteTransaction" && (
@@ -392,8 +440,7 @@ export function Review({
         </p>
       )}
       <p className="muted">
-        Review expires in five minutes. Another saved financial change
-        invalidates this review.
+        Confirm within five minutes. If records change, review again.
       </p>
       {stage === 1 ? (
         <>
@@ -404,17 +451,25 @@ export function Review({
               type="button"
               aria-label="Slide to confirm; accessible confirmation available below"
               disabled={busy}
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()}
               style={{ transform: `translateX(${position}px)` }}
               onPointerDown={(e) => {
                 if (!e.isTrusted || !track.current) return;
+                e.preventDefault();
+                const bounds = track.current.getBoundingClientRect();
+                const scale = bounds.width / track.current.clientWidth;
                 const width =
-                  track.current.clientWidth - e.currentTarget.offsetWidth - 8;
+                  bounds.width -
+                  e.currentTarget.getBoundingClientRect().width -
+                  8 * scale;
                 if (width <= 0) return;
                 setSlideHint("");
                 drag.current = {
                   pointer: e.pointerId,
                   start: e.clientX,
                   width,
+                  scale,
                 };
                 e.currentTarget.setPointerCapture(e.pointerId);
                 setPosition(0);
@@ -428,7 +483,7 @@ export function Review({
                         drag.current.width,
                         e.clientX - drag.current.start,
                       ),
-                    ),
+                    ) / drag.current.scale,
                   );
               }}
               onPointerCancel={() => {
@@ -517,6 +572,6 @@ export function Review({
           uses your signed-in session and deliberate approval.
         </small>
       </p>
-    </dialog>
+    </section>
   );
 }

@@ -1,3 +1,4 @@
+import { openAccountCreation } from "./helpers/workspace-navigation";
 import { openReview } from "./helpers/open-review";
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
@@ -50,6 +51,7 @@ test("deep links, reminder persistence, keyboard, zoom, and cross-tab financial 
     other.getByRole("heading", { name: "Accounts", exact: true }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Synthetic synchronized pocket");

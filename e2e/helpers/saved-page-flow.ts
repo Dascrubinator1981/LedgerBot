@@ -1,3 +1,4 @@
+import { openAccountCreation } from "./workspace-navigation";
 import { expect, type Page } from "@playwright/test";
 import { openReview } from "./open-review";
 export async function savedPageFlow(
@@ -5,6 +6,7 @@ export async function savedPageFlow(
   approve: (p: Page) => Promise<void>,
 ) {
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Synthetic same-day pocket");
@@ -67,12 +69,10 @@ export async function savedPageFlow(
   await expect(page.getByLabel("Description", { exact: true })).toHaveValue(
     "Synthetic interrupted purchase",
   );
-  await expect(
-    page.getByLabel("Signed amount ($)", { exact: true }),
-  ).toHaveValue("");
+  await expect(page.getByLabel("Amount ($)", { exact: true })).toHaveValue("");
   await page.getByLabel("Date", { exact: true }).fill(today);
   await page.getByLabel("Entry type", { exact: true }).selectOption("expense");
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("185");
+  await page.getByLabel("Amount ($)", { exact: true }).fill("185");
   await page
     .getByRole("button", { name: "Prepare transaction for review" })
     .click();

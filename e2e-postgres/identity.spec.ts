@@ -1,3 +1,4 @@
+import { openAccountCreation } from "../e2e/helpers/workspace-navigation";
 import { manualEntryFlow } from "../e2e/helpers/manual-entry-flow";
 import { savedPageFlow } from "../e2e/helpers/saved-page-flow";
 import { openReview } from "../e2e/helpers/open-review";
@@ -87,6 +88,7 @@ test("verified identity, PostgreSQL ledger and second-user isolation work togeth
   ])
     expect(data[key]).toEqual([]);
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Verified synthetic cash");
@@ -107,7 +109,7 @@ test("verified identity, PostgreSQL ledger and second-user isolation work togeth
     .getByLabel("Description", { exact: true })
     .fill("Verified synthetic expense");
   await page.getByLabel("Date", { exact: true }).fill("2026-01-02");
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("-15");
+  await page.getByLabel("Amount ($)", { exact: true }).fill("-15");
   await page
     .getByRole("button", { name: "Prepare transaction for review" })
     .click();

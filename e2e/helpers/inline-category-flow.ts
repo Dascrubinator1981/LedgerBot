@@ -1,3 +1,8 @@
+import {
+  openAccountCreation,
+  openBudgetEntry,
+  openCategories,
+} from "./workspace-navigation";
 import { expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { openReview } from "./open-review";
@@ -14,6 +19,7 @@ async function approve(page: Page) {
 }
 export async function inlineCategoryFlow(page: Page) {
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Synthetic inline pocket");
@@ -34,8 +40,8 @@ export async function inlineCategoryFlow(page: Page) {
   await page
     .getByLabel("Description", { exact: true })
     .fill("Synthetic preserved purchase");
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("-12.34");
-  await page.getByLabel("Split 1 signed amount ($)").fill("-12.34");
+  await page.getByLabel("Amount ($)", { exact: true }).fill("-12.34");
+  await page.getByLabel("Split 1 amount ($)").fill("-12.34");
   await page
     .getByLabel("Split 1 category", { exact: true })
     .selectOption("+add");
@@ -61,9 +67,9 @@ export async function inlineCategoryFlow(page: Page) {
   await expect(
     page.getByLabel("New category for Split 1 category"),
   ).toHaveValue("Synthetic groceries");
-  await expect(
-    page.getByLabel("Signed amount ($)", { exact: true }),
-  ).toHaveValue("-12.34");
+  await expect(page.getByLabel("Amount ($)", { exact: true })).toHaveValue(
+    "-12.34",
+  );
   expect(
     (
       await new AxeBuilder({ page })
@@ -72,7 +78,11 @@ export async function inlineCategoryFlow(page: Page) {
     ).violations,
   ).toEqual([]);
   await page.getByLabel("New category for Split 1 category").press("Enter");
-  await expect(page.getByText("1. category", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "Page changes" })
+      .getByText("Add category", { exact: true }),
+  ).toBeVisible();
   await expect(
     page
       .getByLabel("Split 1 category", { exact: true })
@@ -90,6 +100,7 @@ export async function inlineCategoryFlow(page: Page) {
   await expect(
     page.getByLabel("New category name", { exact: true }),
   ).toHaveValue("Synthetic groceries");
+  await openCategories(page);
   await page
     .getByLabel("New category name", { exact: true })
     .fill("Synthetic renamed groceries");
@@ -108,10 +119,10 @@ export async function inlineCategoryFlow(page: Page) {
   await expect(page.getByLabel("Description", { exact: true })).toHaveValue(
     "Synthetic preserved purchase",
   );
-  await expect(
-    page.getByLabel("Signed amount ($)", { exact: true }),
-  ).toHaveValue("-12.34");
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("99");
+  await expect(page.getByLabel("Amount ($)", { exact: true })).toHaveValue(
+    "-12.34",
+  );
+  await page.getByLabel("Amount ($)", { exact: true }).fill("99");
   await page.getByRole("link", { name: "Budget", exact: true }).click();
   await page
     .getByRole("dialog")
@@ -127,18 +138,18 @@ export async function inlineCategoryFlow(page: Page) {
   await page.reload();
   await page.getByRole("link", { name: /^Inbox/ }).click();
   await page.getByRole("button", { name: "Resume saved review" }).click();
-  await expect(
-    page.getByLabel("Signed amount ($)", { exact: true }),
-  ).toHaveValue("99");
+  await expect(page.getByLabel("Amount ($)", { exact: true })).toHaveValue(
+    "99",
+  );
   await page
     .getByRole("button", { name: "Cancel editing this staged change" })
     .click();
   await page
     .getByRole("button", { name: "Edit change 2", exact: true })
     .click();
-  await expect(
-    page.getByLabel("Signed amount ($)", { exact: true }),
-  ).toHaveValue("-12.34");
+  await expect(page.getByLabel("Amount ($)", { exact: true })).toHaveValue(
+    "-12.34",
+  );
   await page
     .getByRole("button", { name: "Prepare transaction for review" })
     .click();
@@ -155,10 +166,11 @@ export async function inlineCategoryFlow(page: Page) {
     .filter({ hasText: "Synthetic preserved purchase" })
     .getByRole("button", { name: "Edit", exact: true })
     .click();
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("77");
+  await page.getByLabel("Amount ($)", { exact: true }).fill("77");
   await page.getByRole("button", { name: "Cancel edit", exact: true }).click();
   await page.getByRole("link", { name: "Budget", exact: true }).click();
   await expect(page.getByRole("dialog")).not.toBeVisible();
+  await openBudgetEntry(page);
   await page
     .getByLabel("Budget category", { exact: true })
     .selectOption("+add");

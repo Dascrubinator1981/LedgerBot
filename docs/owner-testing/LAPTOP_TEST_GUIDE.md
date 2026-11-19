@@ -1,5 +1,8 @@
 # LedgerBot laptop test book
 
+November 19 navigation update: Accounts → Create New Account opens account creation; click a named account tab to see its balance. Account tools and reconciliation is a disclosure below the account. Ledger defaults to the chosen account, offers All accounts and Expand/Full/Reduce controls. Budget → Create New Budget opens target entry; Current budget shows results; Categories opens standalone category creation. Pending changes sits beside/above the page; Review staged changes opens an inline changes table, and confirmed entries clear from that queue. Amount labels are now Amount ($) and Split N amount ($). All control values below are unchanged. If earlier confirmed records are missing, STOP and use the read-only diagnostic before recreating anything. The separately delivered editable one-step guides have these navigation directions built into their steps and add L/P52–54 for defaults, table sizing and persistence.
+
+
 Candidate: review branch `feat/manual-finance-foundation`, app fixes at `6c6043a` or a later version that includes them. This is a development candidate, not a released service. Guide prepared November 6, 2026; updated November 12 for recurring-schedule edit/cancel checks. Pull the latest review branch before these checks.
 
 Use this beside OWNER_FINDINGS_TEMPLATE.md. Work one section at a time. Record PASS, ISSUE, BLOCKED, NOT TRIED or SUGGESTION. A blocked feature is not a pass. You do not need to diagnose code. Copy the step ID when reporting: for example, `L-LEDGER-C / Step 3`.

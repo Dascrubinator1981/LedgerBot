@@ -1,3 +1,8 @@
+import {
+  openAccountCreation,
+  openBudgetEntry,
+  openCategories,
+} from "./workspace-navigation";
 import { openReview } from "./open-review";
 import { expect, type Page } from "@playwright/test";
 async function approve(page: Page) {
@@ -18,6 +23,7 @@ export async function correlationFlow(page: Page) {
   const today = new Date().toISOString().slice(0, 10),
     month = today.slice(0, 7);
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Correlation pocket");
@@ -30,11 +36,13 @@ export async function correlationFlow(page: Page) {
     .click();
   await approve(page);
   await page.getByRole("link", { name: "Budget", exact: true }).click();
+  await openCategories(page);
   await page.getByLabel("New category name").fill("Correlation bills");
   await page
     .getByRole("button", { name: "Prepare category", exact: true })
     .click();
   await approve(page);
+  await openBudgetEntry(page);
   await page
     .getByLabel("Budget category", { exact: true })
     .selectOption({ label: "Correlation bills" });
@@ -56,14 +64,12 @@ export async function correlationFlow(page: Page) {
     .getByRole("button", { name: "Prepare recurring assumption" })
     .click();
   await approve(page);
-  const schedule = page
-    .locator("article")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "Correlation water bill",
-        exact: true,
-      }),
-    });
+  const schedule = page.locator("article").filter({
+    has: page.getByRole("heading", {
+      name: "Correlation water bill",
+      exact: true,
+    }),
+  });
   await schedule
     .getByRole("button", { name: "Edit schedule", exact: true })
     .click();
@@ -113,14 +119,12 @@ export async function correlationFlow(page: Page) {
       .selectOption({ label: "Correlation pocket · checking" });
     await page.getByLabel("Date", { exact: true }).fill(today);
     await page.getByLabel("Description", { exact: true }).fill(description);
-    await page.getByLabel("Signed amount ($)", { exact: true }).fill(amount);
+    await page.getByLabel("Amount ($)", { exact: true }).fill(amount);
     if (link) {
       await page
         .getByLabel("Split 1 category", { exact: true })
         .selectOption({ label: "Correlation bills" });
-      await page
-        .getByLabel("Split 1 signed amount ($)", { exact: true })
-        .fill(amount);
+      await page.getByLabel("Split 1 amount ($)", { exact: true }).fill(amount);
       await page
         .getByLabel("Recurring bill / income (optional)", { exact: true })
         .selectOption({ label: "Correlation water bill · bill" });

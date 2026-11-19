@@ -1,5 +1,7 @@
 # LedgerBot
 
+Latest workspace update: [November 19 report](docs/NOV19_WORKSPACE_REPORT.md), including account tabs and the unresolved laptop-data investigation.
+
 Private local development milestone. **Fabricated data only; not production-ready.** Ledger holds actuals, Budget holds intentions, Forecaster estimates cash ahead, and Pip is a disabled future integration. No deployment or paid billing is configured.
 
 ## Current staged work

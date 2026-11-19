@@ -136,9 +136,8 @@ export function CategorySelect({
             }}
           />
           <p>
-            Your entry stays here. The category joins your page review and is
-            selected automatically. Nothing is saved to your finances until you
-            confirm.
+            Adds this category to pending changes and selects it here. Confirm
+            when you finish the page.
           </p>
           <div className="actions">
             <button
@@ -146,7 +145,7 @@ export function CategorySelect({
               disabled={busy || !draftName.trim()}
               onClick={reviewCategory}
             >
-              Review new category
+              Add category
             </button>
             <button
               type="button"

@@ -1,3 +1,5 @@
+import { workspacePreferencesSchema } from "@/lib/workspace-preferences";
+import { storageReference } from "@/lib/local-storage";
 import { forecastPreferencesSchema } from "@/lib/forecast-preferences";
 import { NextRequest } from "next/server";
 import { z } from "@/lib/schema";
@@ -14,6 +16,21 @@ export async function GET(request: NextRequest) {
     ...(await state(db, s.userId)),
     csrf: s.csrf,
     authProvider: postgresMode() ? "supabase" : "local-development",
+    identity: {
+      email: (
+        (await db
+          .prepare("SELECT email FROM users WHERE id=?")
+          .get(s.userId)) as { email: string }
+      ).email,
+    },
+    storage: postgresMode()
+      ? {
+          label: "Connected database",
+          reference: "verified-provider",
+          fileName: null,
+          folder: null,
+        }
+      : storageReference(),
   }));
 }
 export async function PATCH(request: NextRequest) {
@@ -32,6 +49,7 @@ export async function PATCH(request: NextRequest) {
         timezone: timezoneSchema.optional(),
         reminders: remindersSchema.optional(),
         forecaster: forecastPreferencesSchema.optional(),
+        workspace: workspacePreferencesSchema.optional(),
       })
       .parse(await body(request));
     if (settings.forecaster?.accountIds.length) {
@@ -43,20 +61,32 @@ export async function PATCH(request: NextRequest) {
       )
         throw new PublicError("Choose only your own forecast accounts");
     }
+    if (settings.workspace) {
+      const owned = await state(db, s.userId, false);
+      const ids = [
+        ...settings.workspace.accountOrder,
+        ...(settings.workspace.defaultAccountId
+          ? [settings.workspace.defaultAccountId]
+          : []),
+      ];
+      if (ids.some((id) => !owned.accounts.some((a) => a.id === id)))
+        throw new PublicError("Choose only your own accounts");
+    }
     await db.exec("BEGIN IMMEDIATE");
     try {
       const old = (await db
         .prepare(
-          "SELECT timezone,reminders,forecast_preferences FROM users WHERE id=?",
+          "SELECT timezone,reminders,forecast_preferences,workspace_preferences FROM users WHERE id=?",
         )
         .get(s.userId)) as {
         timezone: string;
         reminders: string;
         forecast_preferences: string;
+        workspace_preferences: string;
       };
       await db
         .prepare(
-          "UPDATE users SET setup=?,promotions=?,timezone=?,reminders=?,forecast_preferences=? WHERE id=?",
+          "UPDATE users SET setup=?,promotions=?,timezone=?,reminders=?,forecast_preferences=?,workspace_preferences=? WHERE id=?",
         )
         .run(
           settings.setup,
@@ -68,6 +98,9 @@ export async function PATCH(request: NextRequest) {
           settings.forecaster
             ? JSON.stringify(settings.forecaster)
             : old.forecast_preferences,
+          settings.workspace
+            ? JSON.stringify(settings.workspace)
+            : old.workspace_preferences,
           s.userId,
         );
       if (settings.timezone && settings.timezone !== old.timezone)

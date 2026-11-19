@@ -1,10 +1,17 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { storageMarker, rememberStorage } from "./local-storage.ts";
 
-export function openDatabase(
-  path = process.env.LEDGERBOT_DATABASE_PATH || "./data/ledgerbot.sqlite",
-) {
+export function openDatabase(selectedPath?: string) {
+  const path =
+    selectedPath ??
+    process.env.LEDGERBOT_DATABASE_PATH ??
+    "./data/ledgerbot.sqlite";
+  const marker =
+    selectedPath === undefined && path !== ":memory:"
+      ? storageMarker(path)
+      : null;
   if (path !== ":memory:")
     mkdirSync(dirname(resolve(path)), { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(path);
@@ -12,6 +19,7 @@ export function openDatabase(
     "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;",
   );
   migrate(db);
+  if (marker) rememberStorage(marker);
   return db;
 }
 export function migrate(db: DatabaseSync) {
@@ -97,6 +105,11 @@ export function migrate(db: DatabaseSync) {
       "ALTER TABLE users ADD COLUMN forecast_preferences TEXT NOT NULL DEFAULT '{}'",
     );
   db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES(6)");
+  if (!columns("users").includes("workspace_preferences"))
+    db.exec(
+      "ALTER TABLE users ADD COLUMN workspace_preferences TEXT NOT NULL DEFAULT '{}'",
+    );
+  db.exec("INSERT OR IGNORE INTO schema_migrations(version) VALUES(7)");
   if (!columns("sessions").includes("created_at"))
     db.exec(
       "ALTER TABLE sessions ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0",

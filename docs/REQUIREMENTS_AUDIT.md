@@ -470,3 +470,22 @@ The JSON companion contains full source lines, SHA-256 source fingerprints and e
 | conversation:JOINTAPPROVAL | Approval Rules list with either/both partners, configurable action/amount thresholds, same-version approvals and no AI confirmation. | Planned; not implemented | User request, not a command extracted from an attachment. `docs/HOUSEHOLD_APPROVAL_PLAN.md` |
 | conversation:PLAINSETTINGS | Replace programmer jargon with everyday wording across settings, forms, errors and confirmation; technical detail behind More details. | Partial; complete Settings pass pending | User request, not a command extracted from an attachment. `docs/HOUSEHOLD_APPROVAL_PLAN.md`, `src/app/troubleshooting-panel.tsx`, `docs/SPLIT_ENTRY_FEEDBACK_REPORT.md` |
 | conversation:EXHAUSTIVE | Audit each requirement and test meaningful UI/input/auth/failure paths; never claim all possible failures are proven absent. | In progress | User request, not a command extracted from an attachment. `docs/REQUIREMENTS_AUDIT.md`, `docs/TEST_PLAN.md` |
+
+## November 19 owner follow-up
+
+These are the latest owner-requested workspace changes, separate from the original master document's requirements.
+
+| Request | Current status and evidence |
+| --- | --- |
+| Previously approved practice accounts disappeared under the same login/folder/address | **Unresolved on the owner's laptop.** No recovery is claimed. File-backed restart/expired-session regression passes; read-only local counts are needed next. See `LOCAL_DATA_RECOVERY_CHECK.md`. |
+| Prevent silently replacing a missing known local database | Implemented storage marker/startup guard, tested in `tests/workspace-persistence.test.ts`. Does not cover every replacement/corruption case. |
+| Default account first, configurable later | Implemented first-account default and per-user saved preferences; Accounts → Edit page layout and Settings → Account layout. The first-account flow chooses it automatically; a dedicated expanded onboarding wizard remains future work. |
+| Account tabs, user order and a simple edit mode | Implemented on Accounts and Ledger; drag ordering plus Move up/down; default stays first. `e2e/workspace-layout.spec.ts`. |
+| Actual ledger table in a bounded space, persistent visible balance, expand/reduce | Implemented selected-account register and balance header with compact/expanded/full sizes; keyboard-focusable scroll region. `e2e/workspace-layout.spec.ts`. |
+| Simple income/expense/payment entry and inline category addition | Existing exact-cents direction handling retained with plain amount labels, selected-account default and inline staged category creation. Paired transfers remain required between tracked accounts. |
+| Pending changes beside the page and no unchanged-account clutter | Implemented compact pending list and inline review table, expandable exact details and changed balances only. Independent backend-gated human approval retained. Approved batches clear the queue. |
+| Budget sections become tabs, current plan is the normal destination | Implemented Current budget/Create New Budget/Categories; empty month offers creation first. Month-filter links preserve the comparison view. |
+| Updated editable laptop/phone walkthroughs | Fresh downloadable Word/text/HTML copies preserve step IDs/control values and add 52–54 for layout/persistence. Filled owner notes are not imported into Git. Phone still needs tested HTTPS access. |
+| Firefox slider report | Pointer handling accounts for rendered scaling; Chromium release/cancellation checks run at 80% scale. Windows Firefox remains unverified because the official browser download was blocked by the environment proxy. |
+
+See `NOV19_WORKSPACE_REPORT.md` for final executed verification and release limits. This update does not mark the complete master specification or public beta ready.

@@ -1,3 +1,4 @@
+import { workspacePreferencesSchema } from "./workspace-preferences";
 import { proposalText, storedProposal } from "./proposal-storage";
 import { afterOpening } from "./domain";
 import { forecastPreferencesSchema } from "./forecast-preferences";
@@ -93,7 +94,7 @@ export async function state(
 ): Promise<FinanceState> {
   const user = (await db
     .prepare(
-      "SELECT revision,setup,promotions,timezone,reminders,forecast_preferences FROM users WHERE id=?",
+      "SELECT revision,setup,promotions,timezone,reminders,forecast_preferences,workspace_preferences FROM users WHERE id=?",
     )
     .get(userId)) as
     | {
@@ -103,6 +104,7 @@ export async function state(
         timezone: string;
         reminders: string;
         forecast_preferences: string;
+        workspace_preferences: string;
       }
     | undefined;
   if (!user) throw new PublicError("Sign in required");
@@ -121,6 +123,9 @@ export async function state(
       : [],
     revision: user.revision,
     settings: {
+      workspace: workspacePreferencesSchema.parse(
+        JSON.parse(user.workspace_preferences || "{}"),
+      ),
       setup: user.setup,
       promotions: !!user.promotions,
       timezone: user.timezone,
@@ -452,6 +457,13 @@ async function apply(db: FinanceDb, userId: string, op: SingleOperation) {
       await db
         .prepare("INSERT INTO accounts VALUES(?,?,?)")
         .run(id, userId, JSON.stringify(a));
+      if (current.accounts.length === 0)
+        await db
+          .prepare("UPDATE users SET workspace_preferences=? WHERE id=?")
+          .run(
+            JSON.stringify({ defaultAccountId: id, accountOrder: [id] }),
+            userId,
+          );
       break;
     }
     case "category":

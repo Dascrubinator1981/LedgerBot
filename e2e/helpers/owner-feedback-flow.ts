@@ -1,3 +1,9 @@
+import {
+  openAccountCreation,
+  openAccountTools,
+  openBudgetEntry,
+  openCategories,
+} from "./workspace-navigation";
 import { readFile } from "node:fs/promises";
 import { openReview } from "./open-review";
 import { expect, type Page } from "@playwright/test";
@@ -14,6 +20,7 @@ export async function ownerFeedbackFlow(
   await page.getByRole("button", { name: "Start fresh recording" }).click();
   await page.getByRole("button", { name: "Close troubleshooting" }).click();
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Fictional owner check");
@@ -31,6 +38,7 @@ export async function ownerFeedbackFlow(
     .click();
   await approve(page);
   await page.getByRole("link", { name: "Budget", exact: true }).click();
+  await openBudgetEntry(page);
   await page
     .getByLabel("Budget category", { exact: true })
     .selectOption("+add");
@@ -45,6 +53,7 @@ export async function ownerFeedbackFlow(
     "Fictional owner household",
     "Fictional owner automotive",
   ]) {
+    await openCategories(page);
     await page.getByLabel("New category name", { exact: true }).fill(name);
     await expect(
       page.getByLabel("New category name", { exact: true }),
@@ -62,7 +71,7 @@ export async function ownerFeedbackFlow(
   await page
     .getByLabel("Description", { exact: true })
     .fill("Fictional split purchase");
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("185");
+  await page.getByLabel("Amount ($)", { exact: true }).fill("185");
   await page.getByLabel("Entry type", { exact: true }).selectOption("expense");
   const tomorrow = new Date(`${today}T12:00:00Z`);
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
@@ -82,7 +91,7 @@ export async function ownerFeedbackFlow(
         ][i],
       });
     await page
-      .getByLabel(`Split ${i + 1} signed amount ($)`)
+      .getByLabel(`Split ${i + 1} amount ($)`)
       .fill(["80", "50", "55"][i]);
   }
   const prepare = page.getByRole("button", {
@@ -122,9 +131,9 @@ export async function ownerFeedbackFlow(
   );
   await prepare.click();
   await expect(form.getByRole("alert")).toBeVisible();
-  await expect(
-    page.getByLabel("Signed amount ($)", { exact: true }),
-  ).toHaveValue("185");
+  await expect(page.getByLabel("Amount ($)", { exact: true })).toHaveValue(
+    "185",
+  );
   await page.route(
     "**/api/draft-validation",
     (route) =>
@@ -163,9 +172,11 @@ export async function ownerFeedbackFlow(
     state.transactions[0].splits.map((s: { amount: number }) => s.amount),
   ).toEqual([-8000, -5000, -5500]);
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountTools(page);
   await page
     .getByLabel("Account", { exact: true })
     .selectOption({ label: "Fictional owner check · checking" });
+  await openAccountTools(page);
   await page.getByLabel("Statement ending balance ($)").fill("1000");
   const compare = page.getByRole("button", {
     name: "Compare and prepare reconciliation",
@@ -174,6 +185,7 @@ export async function ownerFeedbackFlow(
   await expect(
     page.locator("form").filter({ has: compare }).getByRole("alert"),
   ).toContainText("differ");
+  await openAccountTools(page);
   await page.getByLabel("Statement ending balance ($)").fill("815");
   await compare.click();
   await approve(page);

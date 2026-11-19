@@ -295,6 +295,13 @@ export type Proposal = {
   };
 };
 export type FinanceState = {
+  identity?: { email: string };
+  storage?: {
+    label: string;
+    reference: string;
+    fileName: string | null;
+    folder: string | null;
+  };
   accounts: Account[];
   transactions: Transaction[];
   categories: Category[];
@@ -311,6 +318,7 @@ export type FinanceState = {
   proposals: Proposal[];
   revision: number;
   settings: {
+    workspace?: import("./workspace-preferences").WorkspacePreferences;
     setup: string;
     promotions: boolean;
     timezone?: string;

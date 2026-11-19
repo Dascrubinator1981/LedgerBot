@@ -1,5 +1,8 @@
 # LedgerBot iPhone test book — start here, even if never opened before
 
+November 19 navigation update: Accounts → Create New Account opens account creation; click a named account tab to see its balance. Account tools and reconciliation is a disclosure below the account. Ledger defaults to the chosen account, offers All accounts and Expand/Full/Reduce controls. Budget → Create New Budget opens target entry; Current budget shows results; Categories opens standalone category creation. Pending changes sits beside/above the page; Review staged changes opens an inline changes table, and confirmed entries clear from that queue. Amount labels are now Amount ($) and Split N amount ($). All control values below are unchanged. If earlier confirmed records are missing, STOP and use the read-only diagnostic before recreating anything. The separately delivered editable one-step guides have these navigation directions built into their steps and add L/P52–54 for defaults, table sizing and persistence.
+
+
 Use this with OWNER_FINDINGS_TEMPLATE.md. IDs start `P-` so phone results cannot be confused with laptop results. Record the app commit supplied with the candidate, iPhone model, iOS version (Settings → General → About), Safari, text size and portrait/landscape. Do not record passwords.
 
 Device label: **iPhone tester**. Your requested username `testerip@example.test` works only where fictional local signup is allowed. It cannot receive verification or recovery emails. For a hosted verified-email candidate, use a real inbox you control; an email alias is optional only if your email provider supports it. You can still label reports iPhone tester. The safe logger does not record login email.

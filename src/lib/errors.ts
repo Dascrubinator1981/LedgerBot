@@ -2,11 +2,10 @@ import { ZodError } from "zod";
 
 // Only intentionally public application messages may cross an HTTP boundary.
 export class PublicError extends Error {
-  constructor(
-    message: string,
-    readonly status = 400,
-  ) {
+  readonly status: number;
+  constructor(message: string, status = 400) {
     super(message);
+    this.status = status;
     this.name = "PublicError";
   }
 }

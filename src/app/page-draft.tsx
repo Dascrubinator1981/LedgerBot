@@ -8,6 +8,7 @@ import {
   type formSnapshotSchema,
 } from "@/lib/domain";
 import type { z } from "@/lib/schema";
+import { operationSummary } from "@/lib/operation-summary";
 import { originalDraftValues } from "@/lib/draft-fields";
 import type { Section } from "@/lib/navigation";
 type Snapshot = z.infer<typeof formSnapshotSchema>;
@@ -44,7 +45,7 @@ export function usePageDraft({
   run: (action: () => Promise<void>) => Promise<void>;
   navigateNow: (tab: Destination) => void;
   onReview: (r: { proposal: Proposal; token: string }) => void;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<unknown>;
   onRestore: (snapshot: Snapshot) => void;
   onCancelEdit: () => void;
 }) {
@@ -401,6 +402,8 @@ export function usePageDraft({
     preparedId.current = undefined;
     setSourceId(undefined);
     setItems([]);
+    dirtyForms.current.clear();
+    setDirty(false);
     resetForms.current.clear();
     const next = destination;
     setDestination(null);
@@ -496,13 +499,10 @@ export function usePageDraft({
         tabIndex={-1}
       >
         <h2>
-          Page review · {items.length} prepared change
+          Pending changes · {items.length} prepared change
           {items.length === 1 ? "" : "s"}
         </h2>
-        <p>
-          Not applied to your finances. Finish your entries, then review the
-          exact combined changes.
-        </p>
+        <p>These changes will not take place until confirmed.</p>
         {dirty && (
           <p>
             There are unfinished form edits. Add them to review, save for later
@@ -516,9 +516,18 @@ export function usePageDraft({
         )}
         {items.map((item, index) => (
           <div className="row" key={index}>
-            <span>
-              {index + 1}. {item.operation.kind}
-            </span>
+            <div className="pending-summary">
+              <strong>
+                {state
+                  ? operationSummary(item.operation, state).title
+                  : "Prepared change"}
+              </strong>
+              <small>
+                {state
+                  ? operationSummary(item.operation, state).detail
+                  : item.operation.kind}
+              </small>
+            </div>
             <div className="actions">
               {(item.snapshot || item.operation.kind === "category") && (
                 <button

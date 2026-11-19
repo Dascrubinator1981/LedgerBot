@@ -1,3 +1,8 @@
+import {
+  openAccountCreation,
+  openBudgetEntry,
+  openCategories,
+} from "./workspace-navigation";
 import { expect, type Page } from "@playwright/test";
 import { openReview } from "./open-review";
 export async function manualEntryFlow(
@@ -5,6 +10,7 @@ export async function manualEntryFlow(
   approve: (page: Page) => Promise<void>,
 ) {
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Synthetic flexible pocket");
@@ -20,6 +26,7 @@ export async function manualEntryFlow(
     .click();
   await approve(page);
   await page.getByRole("link", { name: "Budget", exact: true }).click();
+  await openBudgetEntry(page);
   await page
     .getByLabel("Budget category", { exact: true })
     .selectOption("+add");
@@ -33,6 +40,7 @@ export async function manualEntryFlow(
     "Synthetic pending household",
     "Synthetic pending automotive",
   ]) {
+    await openCategories(page);
     await page.getByLabel("New category name", { exact: true }).fill(name);
     await page
       .getByRole("button", { name: "Prepare category", exact: true })
@@ -48,7 +56,7 @@ export async function manualEntryFlow(
   await page
     .getByLabel("Description", { exact: true })
     .fill("Synthetic human purchase");
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("185");
+  await page.getByLabel("Amount ($)", { exact: true }).fill("185");
   await page.getByLabel("Entry type", { exact: true }).selectOption("expense");
   await page.getByLabel("Status", { exact: true }).selectOption("pending");
   await expect(
@@ -70,14 +78,16 @@ export async function manualEntryFlow(
         ][i],
       });
     await page
-      .getByLabel(`Split ${i + 1} signed amount ($)`)
+      .getByLabel(`Split ${i + 1} amount ($)`)
       .fill(["80", "50", "55"][i]);
   }
   await page
     .getByRole("button", { name: "Prepare transaction for review" })
     .click();
   await openReview(page);
-  await expect(page.getByRole("dialog")).toContainText("$1,000.00 → $1,000.00");
+  await expect(page.getByRole("dialog")).not.toContainText(
+    "$1,000.00 → $1,000.00",
+  );
   await expect(page.getByRole("dialog")).not.toContainText("balanceAnchor");
   await approve(page);
   let data = await (await page.request.get("/api/state")).json();
@@ -137,7 +147,7 @@ export async function manualEntryFlow(
   await page
     .getByLabel("Description", { exact: true })
     .fill("Synthetic already included history");
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("10");
+  await page.getByLabel("Amount ($)", { exact: true }).fill("10");
   await page.getByLabel("Entry type", { exact: true }).selectOption("expense");
   await page
     .getByRole("checkbox", {
@@ -149,7 +159,7 @@ export async function manualEntryFlow(
     .getByRole("button", { name: "Prepare transaction for review" })
     .click();
   await openReview(page);
-  await expect(page.getByRole("dialog")).toContainText("$815.00 → $815.00");
+  await expect(page.getByRole("dialog")).not.toContainText("$815.00 → $815.00");
   await approve(page);
   data = await (await page.request.get("/api/state")).json();
   expect(data.transactions).toHaveLength(2);

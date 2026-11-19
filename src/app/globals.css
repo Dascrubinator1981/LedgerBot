@@ -653,3 +653,205 @@ main {
   min-height: 1.5rem;
   margin: 0.25rem;
 }
+/* Compact workspaces: selected account first, forms on demand, review beside the task. */
+[hidden] {
+  display: none !important;
+}
+.workspace-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 1rem;
+  align-items: start;
+}
+.workspace-columns.no-pending {
+  grid-template-columns: minmax(0, 1fr);
+}
+.workspace-primary {
+  min-width: 0;
+}
+.pending-sidebar {
+  position: sticky;
+  top: 1rem;
+  min-width: 0;
+  max-height: 90vh;
+  overflow: auto;
+}
+.pending-sidebar .page-draft {
+  margin: 0;
+  padding: 1rem;
+}
+.pending-summary {
+  display: grid;
+  gap: 0.3rem;
+  overflow-wrap: anywhere;
+}
+.page-draft .row {
+  border-bottom: 1px solid var(--line);
+  padding: 0.65rem 0;
+}
+.page-draft .actions {
+  gap: 0.35rem;
+}
+.page-draft button {
+  padding: 0.5rem 0.7rem;
+  font-size: 0.9rem;
+}
+.account-tabs-bar,
+.budget-tabs-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.account-tabs-bar nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 0.5rem;
+}
+.workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.workspace-tabs button {
+  padding: 0.55rem 0.8rem;
+  min-height: 42px;
+}
+.workspace-tabs [aria-selected="true"],
+.workspace-tabs [aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #193c46;
+}
+.account-order {
+  padding-left: 1.4rem;
+}
+.account-order li {
+  padding: 0.45rem 0;
+}
+.layout-editor {
+  max-height: 50vh;
+  overflow: auto;
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.layout-editor p {
+  font-size: 0.9rem;
+  margin: 0.5rem 0;
+}
+.layout-editor .actions {
+  display: inline-flex;
+  margin-left: 0.5rem;
+}
+.account-tools > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.ledger-register {
+  padding: 0.8rem;
+}
+.ledger-register-heading {
+  position: sticky;
+  top: 3.5rem;
+  background: var(--panel);
+  z-index: 3;
+  padding: 0.5rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: space-between;
+}
+.ledger-scroll {
+  max-height: 340px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.ledger-scroll thead {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  z-index: 1;
+}
+.ledger-register.expanded .ledger-scroll {
+  max-height: 65vh;
+}
+.ledger-register.full {
+  position: fixed;
+  inset: 0.5rem;
+  z-index: 30;
+  margin: 0;
+  overflow: auto;
+}
+.ledger-register.full .ledger-register-heading {
+  top: 0;
+}
+.ledger-register.full .ledger-scroll {
+  max-height: 72vh;
+}
+.inline-review {
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  position: static;
+  width: 100%;
+  margin: 0 0 1rem;
+  padding: 1rem;
+  scroll-margin-top: 1rem;
+}
+.review-table th,
+.review-table td {
+  padding: 0.65rem;
+  text-align: left;
+  vertical-align: top;
+}
+.review-table td {
+  overflow-wrap: anywhere;
+}
+.review-table details {
+  margin-top: 0.4rem;
+}
+.review-table .diff {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  font-size: 0.9rem;
+}
+.card {
+  padding: 1rem;
+}
+.notice {
+  padding: 0.7rem 1rem;
+}
+@media (max-width: 1000px) {
+  .workspace-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pending-sidebar {
+    position: static;
+    max-height: none;
+    grid-row: 1;
+  }
+}
+@media (max-width: 600px) {
+  .account-tabs-bar nav {
+    display: block;
+  }
+  .account-tabs-bar nav > button {
+    margin-top: 0.4rem;
+  }
+  .review-table .diff {
+    grid-template-columns: 1fr;
+  }
+  .ledger-register-heading {
+    top: 0;
+    position: static;
+  }
+  .ledger-scroll {
+    max-height: 420px;
+  }
+  main {
+    padding: 1rem;
+  }
+}

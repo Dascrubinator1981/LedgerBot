@@ -1,3 +1,4 @@
+import { openCategories } from "./workspace-navigation";
 import { openReview } from "./open-review";
 import { expect, type Page } from "@playwright/test";
 export async function sessionFlow(
@@ -17,6 +18,7 @@ export async function sessionFlow(
   await other.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(other.getByRole("heading", { name: "Forecast" })).toBeVisible();
   await other.getByRole("link", { name: "Budget", exact: true }).click();
+  await openCategories(other);
   await other
     .getByLabel("New category name")
     .fill("Synthetic revoked category");

@@ -1,3 +1,9 @@
+import {
+  openAccountCreation,
+  openAccountTools,
+  openBudgetEntry,
+  openCategories,
+} from "./helpers/workspace-navigation";
 import { manualEntryFlow } from "./helpers/manual-entry-flow";
 import AxeBuilder from "@axe-core/playwright";
 import { savedPageFlow } from "./helpers/saved-page-flow";
@@ -44,6 +50,7 @@ test("two users, empty start, reviewed account, expense, reload, and isolation",
   await expect(page.getByText("$0.00", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Skip setup", exact: true }).click();
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Fictional pocket");
@@ -68,7 +75,7 @@ test("two users, empty start, reviewed account, expense, reload, and isolation",
     .selectOption({ label: "Fictional pocket · checking" });
   await page.getByLabel("Date", { exact: true }).fill("2026-01-02");
   await page.getByLabel("Description", { exact: true }).fill("Fictional snack");
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("-15");
+  await page.getByLabel("Amount ($)", { exact: true }).fill("-15");
   await page
     .getByRole("button", { name: "Prepare transaction for review" })
     .click();
@@ -100,6 +107,22 @@ test("two users, empty start, reviewed account, expense, reload, and isolation",
     data: { kind: "deleteTransaction", id: aliceData.transactions[0].id },
   });
   expect(denied.status()).toBe(400);
+  const foreignLayout = await bob.request.patch("/api/state", {
+    headers: { origin: "http://127.0.0.1:3100", "x-csrf-token": data.csrf },
+    data: {
+      ...data.settings,
+      workspace: {
+        defaultAccountId: aliceData.accounts[0].id,
+        accountOrder: [],
+      },
+    },
+  });
+  expect(foreignLayout.status()).toBe(400);
+  expect(
+    (await (await bob.request.get("/api/state")).json()).settings.workspace
+      .defaultAccountId,
+  ).toBeNull();
+
   const forged = await page.request.post("/api/proposals", {
     headers: { origin: "http://127.0.0.1:3100", "x-csrf-token": "forged" },
     data: { kind: "category", name: "Forgery" },
@@ -113,6 +136,7 @@ test("cancelled review stays a draft, keyboard confirmation saves known zero", a
   await page.setViewportSize({ width: 390, height: 844 });
   await signup(page);
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page.getByLabel("Account name", { exact: true }).fill("Zero pocket");
   await page
     .getByLabel("Opening balance ($, positive owed for liabilities)")
@@ -131,8 +155,8 @@ test("cancelled review stays a draft, keyboard confirmation saves known zero", a
   ).toHaveLength(0);
   await page.getByRole("link", { name: /Inbox/ }).click();
   await page
+    .getByRole("dialog")
     .getByRole("button", { name: "Save changes for later review", exact: true })
-    .last()
     .click();
   await page
     .getByRole("button", { name: "Save for later", exact: true })
@@ -162,6 +186,7 @@ test("slide requires release and aborted slide cannot commit", async ({
 }) => {
   await signup(page);
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page.getByLabel("Account name", { exact: true }).fill("Gesture pocket");
   await page
     .getByLabel("Opening balance ($, positive owed for liabilities)")
@@ -171,6 +196,9 @@ test("slide requires release and aborted slide cannot commit", async ({
     .getByRole("button", { name: "Prepare account for review" })
     .click();
   await openReview(page);
+  await page.evaluate(() => {
+    document.documentElement.style.zoom = "0.8";
+  });
   const dialog = page.getByRole("dialog");
   const thumb = dialog.getByRole("button", {
     name: "Slide to confirm; accessible confirmation available below",
@@ -223,6 +251,7 @@ test("successful commit receipt survives a failed balance refresh", async ({
 }) => {
   await signup(page);
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Refresh test pocket");
@@ -266,6 +295,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
   await signup(page);
   async function addAccount(name: string, type: string, opening: string) {
     await page.getByRole("link", { name: "Accounts", exact: true }).click();
+    await openAccountCreation(page);
     await page.getByLabel("Account name", { exact: true }).fill(name);
     await page.getByLabel("Account type", { exact: true }).selectOption(type);
     await page
@@ -282,6 +312,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
   await addAccount("Synthetic savings", "savings", "0");
   for (const name of ["Synthetic food", "Synthetic home"]) {
     await page.getByRole("link", { name: "Budget", exact: true }).click();
+    await openCategories(page);
     await page.getByLabel("New category name").fill(name);
     await page
       .getByRole("button", { name: "Prepare category", exact: true })
@@ -297,20 +328,16 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
   await page
     .getByLabel("Description", { exact: true })
     .fill("Synthetic mixed purchase");
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("-20");
+  await page.getByLabel("Amount ($)", { exact: true }).fill("-20");
   await page
     .getByLabel("Split 1 category", { exact: true })
     .selectOption({ label: "Synthetic food" });
-  await page
-    .getByLabel("Split 1 signed amount ($)", { exact: true })
-    .fill("-12");
+  await page.getByLabel("Split 1 amount ($)", { exact: true }).fill("-12");
   await page.getByRole("button", { name: "Add another split" }).click();
   await page
     .getByLabel("Split 2 category", { exact: true })
     .selectOption({ label: "Synthetic home" });
-  await page
-    .getByLabel("Split 2 signed amount ($)", { exact: true })
-    .fill("-8");
+  await page.getByLabel("Split 2 amount ($)", { exact: true }).fill("-8");
   await page
     .getByRole("button", { name: "Prepare transaction for review" })
     .click();
@@ -382,6 +409,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
     ["Synthetic card", "$40.00"],
     ["Synthetic savings", "$25.00"],
   ]) {
+    await page.getByRole("tab", { name, exact: true }).click();
     await expect(
       page
         .locator(".card")
@@ -390,6 +418,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
     ).toHaveText(amount);
   }
   await page.getByRole("link", { name: "Budget", exact: true }).click();
+  await openBudgetEntry(page);
   await page
     .getByLabel("Budget category", { exact: true })
     .selectOption({ label: "Synthetic food" });
@@ -430,6 +459,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
     }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountTools(page);
   await page
     .getByText("Investigate a statement difference", { exact: true })
     .click();
@@ -437,6 +467,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
     .getByLabel("Investigate account", { exact: true })
     .selectOption({ label: "Synthetic checking · checking" });
   await page.getByLabel("Investigate through date").fill("2026-01-31");
+  await openAccountTools(page);
   await page.getByLabel("Balance to investigate ($)").fill("950");
   await page
     .getByRole("button", { name: "Investigate without saving" })
@@ -453,6 +484,7 @@ test("reviewed card payment, splits, budget, forecast assumptions and reconcilia
   await page
     .getByLabel("Statement ending date", { exact: true })
     .fill("2026-01-31");
+  await openAccountTools(page);
   await page.getByLabel("Statement ending balance ($)").fill("945");
   await page
     .getByRole("button", { name: "Compare and prepare reconciliation" })
@@ -562,6 +594,7 @@ test("Ledger opens as a register with compact editors, selected-row editing and 
 }) => {
   await signup(page);
   await page.getByRole("link", { name: "Accounts", exact: true }).click();
+  await openAccountCreation(page);
   await page
     .getByLabel("Account name", { exact: true })
     .fill("Synthetic register pocket");
@@ -605,7 +638,7 @@ test("Ledger opens as a register with compact editors, selected-row editing and 
     .fill("Synthetic register purchase");
   await page.getByLabel("Date", { exact: true }).fill(today);
   await page.getByLabel("Entry type", { exact: true }).selectOption("expense");
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("185");
+  await page.getByLabel("Amount ($)", { exact: true }).fill("185");
   await page
     .getByRole("button", { name: "Prepare transaction for review" })
     .click();
@@ -630,7 +663,7 @@ test("Ledger opens as a register with compact editors, selected-row editing and 
   await expect(page.getByLabel("Description", { exact: true })).toHaveValue(
     "Synthetic register purchase",
   );
-  await page.getByLabel("Signed amount ($)", { exact: true }).fill("190");
+  await page.getByLabel("Amount ($)", { exact: true }).fill("190");
   await page
     .getByRole("button", { name: "Prepare transaction for review" })
     .click();

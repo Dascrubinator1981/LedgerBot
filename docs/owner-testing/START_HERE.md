@@ -1,5 +1,8 @@
 # Your LedgerBot test pack
 
+November 19 navigation update: Accounts → Create New Account opens account creation; click a named account tab to see its balance. Account tools and reconciliation is a disclosure below the account. Ledger defaults to the chosen account, offers All accounts and Expand/Full/Reduce controls. Budget → Create New Budget opens target entry; Current budget shows results; Categories opens standalone category creation. Pending changes sits beside/above the page; Review staged changes opens an inline changes table, and confirmed entries clear from that queue. Amount labels are now Amount ($) and Split N amount ($). All control values below are unchanged. If earlier confirmed records are missing, STOP and use the read-only diagnostic before recreating anything. The separately delivered editable one-step guides have these navigation directions built into their steps and add L/P52–54 for defaults, table sizing and persistence.
+
+
 The downloadable pack also contains index.html. Double-click it to read the guides in a browser without running the app. Use Ctrl+P to print or Save as PDF. It contains instructions only, no login and no external requests. Your progress is recorded in your private findings file, not automatically in that page.
 
 1. Start with LAPTOP_TEST_GUIDE.md, section L-START-A. Go one section at a time; pause whenever needed.

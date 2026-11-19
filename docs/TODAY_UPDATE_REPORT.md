@@ -1,5 +1,7 @@
 # LedgerBot staged update — November 6, 2026
 
+For the November 19 account tabs, compact review and missing-data investigation, see [NOV19_WORKSPACE_REPORT.md](NOV19_WORKSPACE_REPORT.md). This supersedes older layout descriptions.
+
 For the November 12 schedule-edit restage and hosted Supabase access findings, see [NOV12_RECHECK_REPORT.md](NOV12_RECHECK_REPORT.md). Earlier counts/artifacts below are dated checkpoints.
 
 This is a private development candidate, not a published application or a beta approval. Use invented financial information only.
